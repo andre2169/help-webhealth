@@ -1,0 +1,7 @@
+DISPLAY_NAME=helpweb-health-web
+DESCRIPTION=Frontend do HelpWeb Health
+LANGUAGE=node
+MEMORY=512
+VERSION=latest
+SUBDOMAIN=seufronthelphealth
+CUSTOM_COMMAND=npm run build && node index.js
