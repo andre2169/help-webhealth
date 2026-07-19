@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Icon from "./Icon";
 import UserAvatar from "./UserAvatar";
@@ -19,11 +19,15 @@ export default function Topbar({ title, subtitle }) {
         {subtitle && <span>{subtitle}</span>}
       </div>
       <div className="topbar-actions">
+        <Link to="/" className="topbar-home-link" title="Voltar ao início">
+          <Icon name="home" />
+          <span>Início</span>
+        </Link>
         {user?.name && (
-          <div className="topbar-user-chip">
+          <Link to="/perfil" className="topbar-user-chip" title="Abrir perfil">
             <UserAvatar user={user} size={32} />
             <span>{user.name}</span>
-          </div>
+          </Link>
         )}
         <button className="ghost topbar-logout" onClick={handleLogout}>
           <Icon name="logOut" />

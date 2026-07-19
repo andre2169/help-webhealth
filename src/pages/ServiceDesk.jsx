@@ -40,7 +40,7 @@ export default function ServiceDesk() {
   return (
     <>
       <Topbar title="Painel de atendimento" subtitle="Fila operacional para técnicos" />
-      <main className="main">
+      <main className="main service-desk-page">
         {error && <p className="error">{error}</p>}
         {!data && !error && <p className="loading-line">Carregando fila…</p>}
 

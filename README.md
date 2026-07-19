@@ -19,11 +19,14 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Login e cadastro.
 - Interface responsiva para desktop e celular.
 - Sidebar com navegacao por perfil.
+- Tela de inicio autenticada com atalhos, chamados recentes e orientacoes de uso seguro.
+- Logo, item Inicio e area do usuario com navegacao direta para inicio/perfil.
 - Perfil com telefone, funcao, setor, unidade e preferencia de notificacao.
 - Alteracao de email e senha em duas etapas, com codigo de verificacao gerado pela API.
 - Recuperacao de conta pela tela de login, com codigo enviado ao email cadastrado.
 - Links de login, cadastro e recuperacao separados para evitar confusao em telas pequenas.
-- Abertura de chamados com setor, categoria, equipamento, patrimonio, impacto e foto opcional.
+- Abertura de chamados com setor, categoria, equipamento, patrimonio, impacto e ate 3 fotos opcionais.
+- Fotos tiradas pelo celular sao compactadas antes do envio para reduzir erros de tamanho no deploy com SQLite.
 - Lista de chamados com filtros.
 - Detalhe do chamado com comentarios, timeline e status.
 - Foto de perfil do usuario.
@@ -59,12 +62,14 @@ Navegador -> Frontend React -> API FastAPI -> SQLAlchemy ORM -> Banco SQLite
 
 Usuario comum:
 
+- Inicio
 - Meus chamados
 - Novo chamado
 - Perfil
 
 Tecnico:
 
+- Inicio
 - Dashboard
 - Chamados
 - Novo chamado
@@ -74,6 +79,7 @@ Tecnico:
 
 Administrador:
 
+- Inicio
 - Dashboard
 - Chamados
 - Novo chamado

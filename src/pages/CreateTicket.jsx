@@ -161,7 +161,7 @@ export default function CreateTicket() {
         0
       );
       if (totalSize > MAX_TICKET_IMAGES_TOTAL_LENGTH) {
-        throw new Error("As imagens juntas ficaram grandes demais. Remova uma delas ou use fotos mais leves.");
+        throw new Error("As imagens juntas ficaram grandes demais. Remova uma delas ou anexe fotos mais leves.");
       }
 
       setIssueImages((current) => [...current, ...newImages]);
@@ -304,7 +304,7 @@ export default function CreateTicket() {
           <div className="ticket-photo-field">
             <div>
               <label htmlFor="ticket-photo">Fotos do problema</label>
-              <p>Opcional. Anexe até {MAX_TICKET_IMAGES} imagens para tela azul, erro na impressora, cabo solto ou outro sinal visual.</p>
+              <p>Opcional. Anexe até {MAX_TICKET_IMAGES} imagens. Fotos grandes do celular serão comprimidas antes do envio.</p>
             </div>
             <input
               id="ticket-photo"

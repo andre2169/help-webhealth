@@ -1,10 +1,17 @@
 export const MAX_TICKET_IMAGES = 3;
-export const MAX_TICKET_IMAGES_TOTAL_LENGTH = 1_400_000;
+export const MAX_TICKET_IMAGES_TOTAL_LENGTH = 2_400_000;
+
+const MAX_RAW_TICKET_IMAGE_BYTES = 18 * 1024 * 1024;
+const MAX_TICKET_IMAGE_DATA_URL_LENGTH = 760_000;
 
 const TICKET_IMAGE_TARGETS = [
-  { maxSide: 960, quality: 0.78 },
-  { maxSide: 840, quality: 0.7 },
-  { maxSide: 720, quality: 0.62 },
+  { maxSide: 1400, quality: 0.82 },
+  { maxSide: 1200, quality: 0.78 },
+  { maxSide: 1080, quality: 0.72 },
+  { maxSide: 960, quality: 0.66 },
+  { maxSide: 840, quality: 0.58 },
+  { maxSide: 720, quality: 0.5 },
+  { maxSide: 640, quality: 0.44 },
 ];
 
 function imageToJpegDataUrl(image, { maxSide, quality }) {
@@ -26,8 +33,8 @@ export function fileToTicketImageDataUrl(file) {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      reject(new Error("Use uma imagem de até 5 MB."));
+    if (file.size > MAX_RAW_TICKET_IMAGE_BYTES) {
+      reject(new Error("Use uma imagem de até 18 MB. Fotos do celular serão comprimidas automaticamente."));
       return;
     }
 
@@ -37,15 +44,19 @@ export function fileToTicketImageDataUrl(file) {
       const image = new Image();
       image.onerror = () => reject(new Error("Não foi possível carregar a imagem."));
       image.onload = () => {
-        for (const target of TICKET_IMAGE_TARGETS) {
-          const dataUrl = imageToJpegDataUrl(image, target);
-          if (dataUrl.length <= 480_000) {
-            resolve(dataUrl);
-            return;
+        try {
+          for (const target of TICKET_IMAGE_TARGETS) {
+            const dataUrl = imageToJpegDataUrl(image, target);
+            if (dataUrl.length <= MAX_TICKET_IMAGE_DATA_URL_LENGTH) {
+              resolve(dataUrl);
+              return;
+            }
           }
-        }
 
-        reject(new Error("A imagem ficou grande demais. Tente uma foto mais leve ou recortada."));
+          reject(new Error("A imagem ficou grande demais após a compressão. Tente recortar a foto ou enviar outra imagem."));
+        } catch {
+          reject(new Error("Não foi possível compactar a imagem neste navegador."));
+        }
       };
       image.src = reader.result;
     };

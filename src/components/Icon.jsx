@@ -94,6 +94,13 @@ const ICONS = {
       <path d="M16 19c-.9 1.2-2.2 2-4 2" />
     </>
   ),
+  home: (
+    <>
+      <path d="m4 11 8-7 8 7" />
+      <path d="M6 10v10h12V10" />
+      <path d="M10 20v-6h4v6" />
+    </>
+  ),
   key: (
     <>
       <circle cx="8" cy="15" r="4" />

@@ -16,7 +16,7 @@ export default function Sidebar({ onLogout }) {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
+      <NavLink to="/" className="sidebar-brand">
         <div className="sidebar-brand-mark">
           <Icon name="shield" size={20} />
         </div>
@@ -24,10 +24,19 @@ export default function Sidebar({ onLogout }) {
           <strong>HelpWeb Health</strong>
           <span>Chamados de TI hospitalar</span>
         </div>
-      </div>
+      </NavLink>
 
       <div className="sidebar-section">Operação</div>
       <nav className="sidebar-nav">
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}
+        >
+          <Icon name="home" />
+          <span>Início</span>
+        </NavLink>
+
         {isSupportRole && (
           <NavLink
             to="/dashboard"
@@ -99,13 +108,13 @@ export default function Sidebar({ onLogout }) {
       )}
 
       <div className="sidebar-footer">
-        <div className="sidebar-user">
+        <NavLink to="/perfil" className="sidebar-user">
           <UserAvatar user={user} size={38} className="sidebar-user-avatar" />
           <div className="sidebar-user-info">
             <strong>{user?.name || "-"}</strong>
             <span>{ROLE_LABELS[role] || role}</span>
           </div>
-        </div>
+        </NavLink>
         <button className="ghost full sidebar-logout" onClick={onLogout}>
           <Icon name="logOut" />
           Sair

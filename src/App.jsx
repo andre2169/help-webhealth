@@ -4,6 +4,7 @@ import { RequireAuth, RequireRole } from "./components/RequireAuth";
 import AppLayout from "./components/AppLayout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Tickets from "./pages/Tickets";
 import CreateTicket from "./pages/CreateTicket";
@@ -19,12 +20,6 @@ function PublicOnly({ children }) {
   if (loading) return null;
   if (isAuthenticated) return <Navigate to="/" replace />;
   return children;
-}
-
-function HomeRedirect() {
-  const { user } = useAuth();
-  const isSupportRole = user?.role === "technician" || user?.role === "admin";
-  return <Navigate to={isSupportRole ? "/dashboard" : "/tickets"} replace />;
 }
 
 export default function App() {
@@ -50,7 +45,7 @@ export default function App() {
 
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/" element={<Home />} />
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/tickets/novo" element={<CreateTicket />} />
             <Route path="/tickets/:id" element={<TicketDetail />} />

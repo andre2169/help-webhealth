@@ -67,9 +67,8 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      const user = await login(email, password);
-      const isSupportRole = user?.role === "technician" || user?.role === "admin";
-      navigate(isSupportRole ? "/dashboard" : "/tickets");
+      await login(email, password);
+      navigate("/");
     } catch (err) {
       setError(err.message);
     } finally {
