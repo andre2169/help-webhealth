@@ -590,6 +590,7 @@ button.small {
   display: grid;
   grid-template-columns: 70px 1fr 130px 140px 110px;
   min-width: 760px;
+  max-width: 100%;
   gap: 14px;
   align-items: center;
   padding: 15px 18px;
@@ -620,10 +621,12 @@ button.small {
 
 .ticket-row-main {
   min-width: 0;
+  max-width: 100%;
 }
 
 .ticket-row-main strong {
   display: block;
+  max-width: 100%;
   font-size: 14.5px;
   font-weight: 600;
   color: var(--ink);
@@ -634,6 +637,7 @@ button.small {
 
 .ticket-row-main span {
   display: block;
+  max-width: 100%;
   font-size: 12.5px;
   color: var(--slate);
   white-space: nowrap;
@@ -643,11 +647,15 @@ button.small {
 }
 
 .ticket-row-meta {
+  min-width: 0;
   font-size: 12.5px;
   color: var(--slate);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .ticket-row-date {
+  min-width: 0;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--slate-light);
@@ -2083,6 +2091,7 @@ button.small {
 .home-hero h2 {
   margin-bottom: 8px;
   font-size: 30px;
+  line-height: 1.12;
   color: var(--ink);
 }
 
@@ -2090,9 +2099,11 @@ button.small {
   max-width: 640px;
   color: var(--ink-soft);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .home-hero-actions {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2109,6 +2120,7 @@ button.small {
 
 .home-stat-card {
   min-width: 0;
+  max-width: 100%;
 }
 
 .home-action-grid {
@@ -2119,6 +2131,8 @@ button.small {
 }
 
 .home-action-card {
+  min-width: 0;
+  max-width: 100%;
   min-height: 96px;
   justify-content: flex-start;
   padding: 16px;
@@ -2185,6 +2199,70 @@ button.small {
   background: var(--surface-muted);
   color: var(--ink-soft);
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) and (min-width: 721px) {
+  .main {
+    padding: 24px 22px 52px;
+  }
+
+  .home-page {
+    max-width: 100%;
+  }
+
+  .home-hero {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    align-items: start;
+    padding: 24px;
+  }
+
+  .home-hero-copy,
+  .home-hero p {
+    max-width: 720px;
+  }
+
+  .home-hero-actions {
+    justify-content: flex-start;
+  }
+
+  .home-stat-grid,
+  .home-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-dashboard-grid,
+  .dashboard-grid,
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) and (min-width: 721px) {
+  .topbar {
+    padding: 0 18px;
+    gap: 10px;
+  }
+
+  .topbar-title span {
+    max-width: 220px;
+  }
+
+  .topbar-home-link {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+  }
+
+  .topbar-home-link span,
+  .topbar-user-chip span {
+    display: none;
+  }
+
+  .topbar-user-chip {
+    max-width: 46px;
+    padding: 3px;
+  }
 }
 
 .profile-identity {
@@ -2489,11 +2567,14 @@ button.small {
 
 .timeline-card {
   min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-muted);
   padding: 11px 13px;
   box-shadow: 0 6px 18px rgba(39, 55, 30, 0.045);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .timeline-item.is-comment .timeline-card {
@@ -2951,6 +3032,14 @@ button.small {
   font-weight: 700;
 }
 
+.ticket-row-main strong,
+.ticket-row-main span,
+.compact-ticket-title > span:last-child,
+.ticket-action-title > span:last-child {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .ticket-row-id.ticket-code {
   justify-self: start;
   align-self: center;
@@ -2973,6 +3062,9 @@ button.small {
   .compact-ticket-title > span:last-child,
   .ticket-action-title > span:last-child {
     white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .ticket-row-id.ticket-code {
@@ -2992,6 +3084,7 @@ button.small {
 @media (max-width: 720px) {
   .ticket-row {
     grid-template-columns: minmax(0, 1fr) auto;
+    overflow: hidden;
   }
 
   .ticket-row-id.ticket-code {
@@ -3008,16 +3101,19 @@ button.small {
   .ticket-row-main {
     grid-column: 1 / -1;
     grid-row: 2;
+    min-width: 0;
   }
 
   .ticket-row-meta {
     grid-column: 1;
     grid-row: 3;
+    max-width: 100%;
   }
 
   .ticket-row-date {
     grid-column: 2;
     grid-row: 3;
+    max-width: 100%;
   }
 }
 
@@ -3109,15 +3205,21 @@ button.small {
 .report-row span,
 .report-head span,
 .detail-description,
-.timeline-body {
+.timeline-body,
+.timeline-card {
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .metric-row span {
+  overflow: visible;
   white-space: normal;
   text-overflow: clip;
+}
+
+.metric-row strong {
+  min-width: max-content;
 }
 
 .report-filter-summary div,

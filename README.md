@@ -35,6 +35,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Indicadores de volume diario, idade da fila ativa, chamados sem tecnico, reaberturas e solicitantes recorrentes.
 - Geracao de relatorio em PDF pelo recurso de impressao do navegador, com folha centralizada e campos ajustaveis.
 - Visualizacao ampliada das fotos anexadas ao chamado, com navegacao entre imagens e controle de zoom.
+- Ajustes responsivos para telas intermediarias, tablets e celulares, evitando que cards, tickets e textos longos ultrapassem os blocos.
 - Controle de redirecionamento por perfil.
 - Logout chama a API para revogar o token atual e remove o token local.
 - Formatacao de data/hora no fuso `America/Sao_Paulo`.
