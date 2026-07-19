@@ -37,6 +37,16 @@ const ICONS = {
       <path d="m5 12 4 4L19 6" />
     </>
   ),
+  chevronLeft: (
+    <>
+      <path d="m15 18-6-6 6-6" />
+    </>
+  ),
+  chevronRight: (
+    <>
+      <path d="m9 18 6-6-6-6" />
+    </>
+  ),
   clock: (
     <>
       <circle cx="12" cy="12" r="8" />
@@ -226,6 +236,27 @@ const ICONS = {
       <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
       <path d="M2 20a6 6 0 0 1 12 0" />
       <path d="M17 14a5 5 0 0 1 5 5" />
+    </>
+  ),
+  x: (
+    <>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </>
+  ),
+  zoomIn: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M11 8v6" />
+      <path d="M8 11h6" />
+    </>
+  ),
+  zoomOut: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M8 11h6" />
     </>
   ),
 };

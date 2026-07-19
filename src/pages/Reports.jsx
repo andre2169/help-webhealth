@@ -324,13 +324,16 @@ function buildReportDocument({
       font-family: Arial, Helvetica, sans-serif;
       font-size: 12px;
       line-height: 1.45;
+      overflow-x: hidden;
     }
     .page {
-      width: 210mm;
+      width: min(100%, 210mm);
       min-height: 297mm;
       margin: 0 auto;
       padding: 18mm;
       background: #fff;
+      overflow: hidden;
+      box-shadow: 0 18px 50px rgba(38, 55, 30, 0.14);
     }
     .report-header {
       display: flex;
@@ -391,6 +394,8 @@ function buildReportDocument({
       border: 0;
       text-align: left;
       vertical-align: top;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     .filters-table th {
       width: 88px;
@@ -458,6 +463,8 @@ function buildReportDocument({
       padding: 7px 6px;
       border-bottom: 1px solid #e5ece0;
       text-align: left;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     thead th {
       color: #53604e;
@@ -473,6 +480,7 @@ function buildReportDocument({
       text-align: right;
       font-weight: 700;
       color: #2f6426;
+      white-space: nowrap;
     }
     .empty-row {
       color: #6b7665;
@@ -506,10 +514,12 @@ function buildReportDocument({
     @media print {
       body { background: #fff; }
       .page {
-        width: auto;
+        width: 100%;
+        max-width: none;
         min-height: auto;
         margin: 0;
         padding: 0;
+        box-shadow: none;
       }
       .actions { display: none; }
     }
@@ -698,6 +708,7 @@ export default function Reports() {
     );
     reportWindow.document.close();
     reportWindow.focus();
+    window.setTimeout(() => reportWindow.print(), 250);
   }
 
   useEffect(() => {

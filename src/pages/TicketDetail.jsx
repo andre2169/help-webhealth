@@ -11,6 +11,7 @@ import {
   resolveTicket,
 } from "../api/api";
 import Icon from "../components/Icon";
+import ImageLightbox from "../components/ImageLightbox";
 import StatusBadge from "../components/StatusBadge";
 import Topbar from "../components/Topbar";
 import UserAvatar from "../components/UserAvatar";
@@ -66,6 +67,7 @@ export default function TicketDetail() {
   const [commentError, setCommentError] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const [notice, setNotice] = useState(location.state?.notice || "");
+  const [viewerIndex, setViewerIndex] = useState(null);
 
   const loadTimeline = useCallback(async () => {
     setTimelineLoading(true);
@@ -272,7 +274,15 @@ export default function TicketDetail() {
                 <div className="ticket-issue-image-grid">
                   {issueImages.map((image, index) => (
                     <figure className="ticket-issue-image" key={`${image.slice(0, 32)}-${index}`}>
-                      <img src={image} alt={`Foto anexada ao chamado ${index + 1}`} />
+                      <button
+                        type="button"
+                        className="image-thumb-button"
+                        onClick={() => setViewerIndex(index)}
+                        aria-label={`Ampliar foto ${index + 1}`}
+                      >
+                        <img src={image} alt={`Foto anexada ao chamado ${index + 1}`} />
+                        <span>Ampliar</span>
+                      </button>
                       <figcaption>Imagem {index + 1}</figcaption>
                     </figure>
                   ))}
@@ -472,6 +482,17 @@ export default function TicketDetail() {
           </div>
         </div>
       </main>
+
+      {viewerIndex !== null && (
+        <ImageLightbox
+          images={issueImages.map((image, index) => ({
+            src: image,
+            name: `Foto do problema ${index + 1}`,
+          }))}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
     </>
   );
 }

@@ -21,6 +21,8 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Sidebar com navegacao por perfil.
 - Perfil com telefone, funcao, setor, unidade e preferencia de notificacao.
 - Alteracao de email e senha em duas etapas, com codigo de verificacao gerado pela API.
+- Recuperacao de conta pela tela de login, com codigo enviado ao email cadastrado.
+- Links de login, cadastro e recuperacao separados para evitar confusao em telas pequenas.
 - Abertura de chamados com setor, categoria, equipamento, patrimonio, impacto e foto opcional.
 - Lista de chamados com filtros.
 - Detalhe do chamado com comentarios, timeline e status.
@@ -28,10 +30,30 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Dashboard e relatorios apenas para tecnicos e administradores.
 - Relatorios com filtros por periodo, status, prioridade, impacto, setor e categoria.
 - Indicadores de volume diario, idade da fila ativa, chamados sem tecnico, reaberturas e solicitantes recorrentes.
-- Geracao de relatorio em PDF pelo recurso de impressao do navegador.
+- Geracao de relatorio em PDF pelo recurso de impressao do navegador, com folha centralizada e campos ajustaveis.
+- Visualizacao ampliada das fotos anexadas ao chamado, com navegacao entre imagens e controle de zoom.
 - Controle de redirecionamento por perfil.
 - Logout chama a API para revogar o token atual e remove o token local.
 - Formatacao de data/hora no fuso `America/Sao_Paulo`.
+- Em 19/07/2026, as dependencias de producao foram verificadas com `npm audit --omit=dev`, sem vulnerabilidades conhecidas no resultado.
+
+## Comunicacao com backend
+
+O frontend nao acessa o banco de dados diretamente. Toda leitura ou alteracao passa pela API configurada em `VITE_API_URL`.
+
+O arquivo responsavel por centralizar essas chamadas e:
+
+```text
+src/api/api.js
+```
+
+Isso mantem o SQLite e as regras de negocio protegidos no backend. O navegador recebe apenas as respostas permitidas pelos endpoints da API.
+
+Nao existe conexao do frontend com SQLite, arquivo `.db`, SQLAlchemy ou qualquer credencial de banco. O fluxo correto e sempre:
+
+```text
+Navegador -> Frontend React -> API FastAPI -> SQLAlchemy ORM -> Banco SQLite
+```
 
 ## Perfis na interface
 
@@ -182,3 +204,5 @@ Esses arquivos ja estao cobertos pelo `.gitignore`.
 O frontend demonstra preocupacao com acessibilidade pratica, responsividade, separacao por perfis e simplicidade para o usuario final. A interface prioriza textos diretos, fluxo simples de abertura de chamado e possibilidade de uso pelo celular, o que e relevante em ambientes de saude publica com funcionarios de diferentes niveis de familiaridade tecnologica.
 
 A tela de relatorios tambem apoia a gestao do suporte ao permitir recortes por periodo e outros filtros, alem de apresentar volume diario, idade da fila, solicitantes recorrentes, chamados sem tecnico e reaberturas. A interface ainda permite gerar uma versao em PDF para registro, apresentacao ou compartilhamento institucional.
+
+As fotos anexadas ajudam o tecnico a entender rapidamente problemas visuais, como tela de erro, falha em impressora, cabo solto, equipamento desligado ou mensagem exibida por sistema interno. A visualizacao ampliada foi pensada para uso tanto no computador quanto no celular.

@@ -1371,6 +1371,18 @@ button.small {
   text-decoration: underline;
 }
 
+.auth-separator {
+  display: inline-block;
+  margin: 0 8px;
+  color: var(--ink-soft);
+}
+
+.recovery-verification {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
 /* ---------- Feedback ---------- */
 .error {
   background: var(--danger-soft);
@@ -2791,6 +2803,279 @@ button.small {
 
   .report-filter-summary {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Auth recovery links ---------- */
+.auth-switch {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+  text-align: center;
+}
+
+.auth-link-button {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  background: var(--surface-muted);
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+
+.auth-link-button:hover {
+  background: var(--primary-soft);
+}
+
+.auth-register-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--slate);
+  font-size: 13px;
+}
+
+.auth-register-link a {
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.auth-register-link a:hover {
+  text-decoration: underline;
+}
+
+.auth-separator {
+  display: none;
+}
+
+/* ---------- Stable text wrapping ---------- */
+.metric-row {
+  align-items: flex-start;
+}
+
+.metric-row span,
+.meta-row span,
+.report-row span,
+.report-head span,
+.detail-description,
+.timeline-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.metric-row span {
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.report-filter-summary div,
+.metric-list {
+  cursor: default;
+}
+
+.password-toggle {
+  min-width: 36px;
+  margin: 0;
+}
+
+/* ---------- Image preview / lightbox ---------- */
+.image-thumb-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #101510;
+  color: #fff;
+}
+
+.image-thumb-button:hover {
+  background: #101510;
+}
+
+.image-thumb-button img {
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.image-thumb-button:hover img {
+  opacity: 0.82;
+  transform: scale(1.02);
+}
+
+.image-thumb-button span {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(11, 18, 12, 0.78);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.image-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  background: rgba(8, 13, 9, 0.82);
+}
+
+.image-lightbox-backdrop:hover {
+  background: rgba(8, 13, 9, 0.86);
+}
+
+.image-lightbox-panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 980px);
+  height: min(88vh, 720px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  background: #101510;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+}
+
+.image-lightbox-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(24, 35, 21, 0.96);
+  color: #fff;
+}
+
+.image-lightbox-toolbar strong,
+.image-lightbox-toolbar span {
+  display: block;
+}
+
+.image-lightbox-toolbar strong {
+  max-width: 56vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-lightbox-toolbar span {
+  color: #cddac7;
+  font-size: 12px;
+}
+
+.image-lightbox-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.image-lightbox-stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    #0c110d;
+  background-size: 28px 28px;
+}
+
+.image-lightbox-scroll {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.image-lightbox-scroll img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  transition: transform 0.15s ease;
+}
+
+.image-lightbox-nav {
+  position: relative;
+  z-index: 2;
+  width: 44px;
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.image-lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+@media (max-width: 720px) {
+  .auth-switch {
+    gap: 10px;
+  }
+
+  .auth-register-link {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .image-lightbox {
+    padding: 0;
+  }
+
+  .image-lightbox-panel {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .image-lightbox-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .image-lightbox-toolbar strong {
+    max-width: calc(100vw - 28px);
+  }
+
+  .image-lightbox-actions {
+    width: 100%;
+  }
+
+  .image-lightbox-actions button {
+    flex: 1;
+  }
+
+  .image-lightbox-nav {
+    width: 38px;
   }
 }
 

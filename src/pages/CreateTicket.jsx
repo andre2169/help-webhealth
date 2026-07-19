@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTicket } from "../api/api";
 import Icon from "../components/Icon";
+import ImageLightbox from "../components/ImageLightbox";
 import Topbar from "../components/Topbar";
 import {
   MAX_TICKET_IMAGES,
@@ -84,6 +85,7 @@ export default function CreateTicket() {
   const [imageError, setImageError] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -326,7 +328,15 @@ export default function CreateTicket() {
               <div className="ticket-photo-preview-grid">
                 {issueImages.map((image, index) => (
                   <figure className="ticket-photo-preview" key={image.id}>
-                    <img src={image.src} alt={`Pré-visualização do problema ${index + 1}`} />
+                    <button
+                      type="button"
+                      className="image-thumb-button"
+                      onClick={() => setPreviewIndex(index)}
+                      aria-label={`Ampliar pré-visualização ${index + 1}`}
+                    >
+                      <img src={image.src} alt={`Pré-visualização do problema ${index + 1}`} />
+                      <span>Ampliar</span>
+                    </button>
                     <figcaption>
                       <span>{image.name || `Imagem ${index + 1}`}</span>
                       <button type="button" className="ghost small" onClick={() => removeIssueImage(image.id)}>
@@ -348,6 +358,14 @@ export default function CreateTicket() {
           </button>
         </form>
       </main>
+
+      {previewIndex !== null && (
+        <ImageLightbox
+          images={issueImages}
+          initialIndex={previewIndex}
+          onClose={() => setPreviewIndex(null)}
+        />
+      )}
     </>
   );
 }

@@ -142,6 +142,31 @@ export async function confirmPasswordChange({ newPassword, code }) {
   return handle(response);
 }
 
+export async function requestAccountRecovery({ email, newPassword }) {
+  const response = await fetch(`${API_URL}/auth/password/recovery/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      new_password: newPassword,
+    }),
+  });
+  return handle(response);
+}
+
+export async function confirmAccountRecovery({ email, newPassword, code }) {
+  const response = await fetch(`${API_URL}/auth/password/recovery/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      new_password: newPassword,
+      code,
+    }),
+  });
+  return handle(response);
+}
+
 export async function requestEmailChange({ newEmail, currentPassword }) {
   const response = await fetch(`${API_URL}/auth/me/email/request`, {
     method: "POST",
