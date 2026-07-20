@@ -86,7 +86,12 @@ export default function AdminUsers() {
             users.map((u) => (
               <div className="admin-row" key={u.id}>
                 <span>{u.name}</span>
-                <span style={{ color: "var(--slate)" }}>{u.email}</span>
+                <span style={{ color: "var(--slate)" }}>
+                  {u.email_masked || u.email}
+                  <small className={`email-verified-pill ${u.email_verified ? "is-ok" : "is-pending"}`}>
+                    {u.email_verified ? "Confirmado" : "Pendente"}
+                  </small>
+                </span>
                 <span>
                   <RoleBadge role={u.role} />
                 </span>

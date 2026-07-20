@@ -1,13 +1,15 @@
 const API_URL = (
-  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/v1"
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
 ).replace(/\/$/, "");
 const API_BASE_URL = API_URL.replace(/\/api\/v1$/, "");
-const AUTH_TOKEN_KEY = "helpwebhealth_token";
-const LEGACY_AUTH_TOKEN_KEY = "token";
+const LEGACY_AUTH_TOKEN_KEYS = ["helpwebhealth_token", "token"];
 
 function removeLegacyAuthToken() {
   try {
-    localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+    LEGACY_AUTH_TOKEN_KEYS.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
   } catch {
     // Alguns navegadores bloqueiam storage em modo privado.
   }
@@ -20,17 +22,15 @@ export function getApiBaseUrl() {
 }
 
 export function getAuthToken() {
-  return sessionStorage.getItem(AUTH_TOKEN_KEY);
+  return null;
 }
 
-export function storeAuthToken(token) {
-  removeLegacyAuthToken();
-  sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+export function storeAuthToken() {
+  clearAuthToken();
 }
 
 export function clearAuthToken() {
   removeLegacyAuthToken();
-  sessionStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
 export async function checkApiHealth() {
@@ -46,11 +46,8 @@ export async function checkApiHealth() {
 }
 
 function getAuthHeaders() {
-  const token = getAuthToken();
-
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
   };
 }
 
@@ -80,6 +77,7 @@ async function handle(response) {
 export async function login(email, password) {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
@@ -88,6 +86,7 @@ export async function login(email, password) {
 
 export async function getMe() {
   const response = await fetch(`${API_URL}/auth/me`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -104,6 +103,7 @@ export async function updateMe({
 }) {
   const response = await fetch(`${API_URL}/auth/me`, {
     method: "PATCH",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({
       name,
@@ -121,6 +121,7 @@ export async function updateMe({
 export async function requestPasswordChange({ currentPassword, newPassword }) {
   const response = await fetch(`${API_URL}/auth/me/password/request`, {
     method: "POST",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({
       current_password: currentPassword,
@@ -133,6 +134,7 @@ export async function requestPasswordChange({ currentPassword, newPassword }) {
 export async function confirmPasswordChange({ newPassword, code }) {
   const response = await fetch(`${API_URL}/auth/me/password/confirm`, {
     method: "POST",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({
       new_password: newPassword,
@@ -145,6 +147,7 @@ export async function confirmPasswordChange({ newPassword, code }) {
 export async function requestAccountRecovery({ email, newPassword }) {
   const response = await fetch(`${API_URL}/auth/password/recovery/request`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       email,
@@ -157,6 +160,7 @@ export async function requestAccountRecovery({ email, newPassword }) {
 export async function confirmAccountRecovery({ email, newPassword, code }) {
   const response = await fetch(`${API_URL}/auth/password/recovery/confirm`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       email,
@@ -170,6 +174,7 @@ export async function confirmAccountRecovery({ email, newPassword, code }) {
 export async function requestEmailChange({ newEmail, currentPassword }) {
   const response = await fetch(`${API_URL}/auth/me/email/request`, {
     method: "POST",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({
       new_email: newEmail,
@@ -182,6 +187,7 @@ export async function requestEmailChange({ newEmail, currentPassword }) {
 export async function confirmEmailChange({ newEmail, code }) {
   const response = await fetch(`${API_URL}/auth/me/email/confirm`, {
     method: "POST",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({
       new_email: newEmail,
@@ -191,16 +197,32 @@ export async function confirmEmailChange({ newEmail, code }) {
   return handle(response);
 }
 
-export async function logout() {
-  const token = getAuthToken();
+export async function requestEmailVerification() {
+  const response = await fetch(`${API_URL}/auth/me/email-verification/request`, {
+    method: "POST",
+    credentials: "include",
+    headers: getAuthHeaders(),
+  });
+  return handle(response);
+}
 
+export async function confirmEmailVerification({ code }) {
+  const response = await fetch(`${API_URL}/auth/me/email-verification/confirm`, {
+    method: "POST",
+    credentials: "include",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ code }),
+  });
+  return handle(response);
+}
+
+export async function logout() {
   try {
-    if (token) {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-    }
+    await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: getAuthHeaders(),
+    });
   } finally {
     clearAuthToken();
   }
@@ -218,6 +240,7 @@ export async function registerUser({
 }) {
   const response = await fetch(`${API_URL}/users/`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name,
@@ -260,6 +283,7 @@ export async function getTickets({
   if (operationalImpact) params.append("operational_impact", operationalImpact);
 
   const response = await fetch(`${API_URL}/tickets/?${params.toString()}`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -280,6 +304,7 @@ export async function createTicket({
   const images = issueImages.length ? issueImages : issueImage ? [issueImage] : [];
   const response = await fetch(`${API_URL}/tickets/`, {
     method: "POST",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({
       title,
@@ -299,6 +324,7 @@ export async function createTicket({
 
 export async function getTicketById(ticketId) {
   const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -307,6 +333,7 @@ export async function getTicketById(ticketId) {
 function patchTicket(ticketId, action) {
   return fetch(`${API_URL}/tickets/${ticketId}/${action}`, {
     method: "PATCH",
+    credentials: "include",
     headers: getAuthHeaders(),
   }).then(handle);
 }
@@ -319,6 +346,7 @@ export const reopenTicket = (ticketId) => patchTicket(ticketId, "reopen");
 export async function deleteTicket(ticketId) {
   const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
     method: "DELETE",
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -326,6 +354,7 @@ export async function deleteTicket(ticketId) {
 
 export async function getTicketTimeline(ticketId) {
   const response = await fetch(`${API_URL}/tickets/${ticketId}/timeline`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -334,6 +363,7 @@ export async function getTicketTimeline(ticketId) {
 export async function createComment(ticketId, content) {
   const response = await fetch(`${API_URL}/tickets/${ticketId}/comments/`, {
     method: "POST",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({ content }),
   });
@@ -343,6 +373,7 @@ export async function createComment(ticketId, content) {
 /* ---------- Dashboard / Relatórios ---------- */
 export async function getDashboardSummary() {
   const response = await fetch(`${API_URL}/dashboard/summary`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -368,6 +399,7 @@ export async function getReportsOverview({
 
   const query = params.toString();
   const response = await fetch(`${API_URL}/reports/overview${query ? `?${query}` : ""}`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -376,6 +408,7 @@ export async function getReportsOverview({
 /* ---------- Admin ---------- */
 export async function adminListUsers() {
   const response = await fetch(`${API_URL}/admin/users`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -383,6 +416,7 @@ export async function adminListUsers() {
 
 export async function adminGetUser(userId) {
   const response = await fetch(`${API_URL}/admin/users/${userId}`, {
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
@@ -393,6 +427,7 @@ export async function adminChangeUserRole(userId, role) {
     `${API_URL}/admin/users/${userId}/role?role=${encodeURIComponent(role)}`,
     {
       method: "PATCH",
+      credentials: "include",
       headers: getAuthHeaders(),
     }
   );
@@ -402,6 +437,7 @@ export async function adminChangeUserRole(userId, role) {
 export async function adminUpdateUser(userId, { name, email }) {
   const response = await fetch(`${API_URL}/admin/users/${userId}`, {
     method: "PATCH",
+    credentials: "include",
     headers: getAuthHeaders(),
     body: JSON.stringify({ name, email }),
   });
@@ -411,6 +447,7 @@ export async function adminUpdateUser(userId, { name, email }) {
 export async function adminDeleteUser(userId) {
   const response = await fetch(`${API_URL}/admin/users/${userId}`, {
     method: "DELETE",
+    credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);

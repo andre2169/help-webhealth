@@ -4,6 +4,7 @@ import { createTicket } from "../api/api";
 import Icon from "../components/Icon";
 import ImageLightbox from "../components/ImageLightbox";
 import Topbar from "../components/Topbar";
+import { useAuth } from "../context/AuthContext";
 import {
   MAX_TICKET_IMAGES,
   MAX_TICKET_IMAGES_TOTAL_LENGTH,
@@ -73,6 +74,7 @@ function counterClass(value, limit) {
 
 export default function CreateTicket() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Infraestrutura");
@@ -90,6 +92,11 @@ export default function CreateTicket() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+
+    if (user && !user.email_verified) {
+      setError("Confirme seu email no perfil antes de abrir chamados.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -189,7 +196,25 @@ export default function CreateTicket() {
           </div>
         </div>
 
-        <form className="form-card health-form-card" onSubmit={handleSubmit}>
+        {user && !user.email_verified && (
+          <section className="panel email-verification-panel ticket-verification-gate">
+            <div>
+              <h3>
+                <Icon name="shield" />
+                Confirme seu email
+              </h3>
+              <p className="muted-note">
+                Por segurança, sua conta precisa confirmar o email antes de registrar chamados.
+              </p>
+            </div>
+            <button type="button" className="secondary" onClick={() => navigate("/perfil")}>
+              <Icon name="mail" />
+              Ir para confirmação
+            </button>
+          </section>
+        )}
+
+        <form className="form-card health-form-card" onSubmit={handleSubmit} aria-disabled={user && !user.email_verified}>
           <label>Título</label>
           <input
             value={title}
@@ -352,7 +377,7 @@ export default function CreateTicket() {
 
           {error && <p className="error">{error}</p>}
 
-          <button type="submit" disabled={submitting}>
+          <button type="submit" disabled={submitting || (user && !user.email_verified)}>
             <Icon name="send" />
             {submitting ? "Criando..." : "Criar chamado"}
           </button>

@@ -37,8 +37,9 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Visualizacao ampliada das fotos anexadas ao chamado, com navegacao entre imagens e controle de zoom.
 - Ajustes responsivos para telas intermediarias, tablets e celulares, evitando que cards, tickets e textos longos ultrapassem os blocos.
 - Controle de redirecionamento por perfil.
-- Logout chama a API para revogar o token atual e remove o token local.
-- O JWT fica em `sessionStorage`, nao em `localStorage`; a chave antiga de `localStorage` e removida ao carregar a aplicacao.
+- Login usa cookie HttpOnly emitido pela API; o JavaScript do frontend nao le o JWT.
+- Logout chama a API para revogar o token atual e limpar o cookie da sessao.
+- Chaves antigas de token em `localStorage`/`sessionStorage` sao removidas ao carregar a aplicacao.
 - Servidor estatico de producao inclui headers de seguranca como CSP, X-Frame-Options, nosniff, Referrer-Policy, HSTS e Permissions-Policy.
 - Formatacao de data/hora no fuso `America/Sao_Paulo`.
 - Em 19/07/2026, as dependencias de producao foram verificadas com `npm audit --omit=dev`, sem vulnerabilidades conhecidas no resultado.
@@ -55,11 +56,12 @@ src/api/api.js
 ```
 
 Isso mantem o SQLite e as regras de negocio protegidos no backend. O navegador recebe apenas as respostas permitidas pelos endpoints da API.
+Validacoes no frontend existem apenas para orientar o usuario antes do envio. As decisoes sensiveis ficam no backend: autenticacao, autorizacao, status do chamado, SLA, filtros aceitos, limites de upload, confirmacao de email e calculos dos relatorios.
 
 Nao existe conexao do frontend com SQLite, arquivo `.db`, SQLAlchemy ou qualquer credencial de banco. O fluxo correto e sempre:
 
 ```text
-Navegador -> Frontend React -> API FastAPI -> SQLAlchemy ORM -> Banco SQLite
+Navegador -> Frontend React -> API FastAPI -> SQLAlchemy ORM -> Banco SQLite/PostgreSQL
 ```
 
 ## Perfis na interface
@@ -115,7 +117,7 @@ helphealth-web/
 Crie um arquivo `.env` na raiz do frontend com base no `.env.example`:
 
 ```env
-VITE_API_URL=http://127.0.0.1:8000/api/v1
+VITE_API_URL=http://localhost:8000/api/v1
 ```
 
 Para usar a API hospedada:
@@ -145,7 +147,7 @@ npm install
 Crie o `.env`:
 
 ```env
-VITE_API_URL=http://127.0.0.1:8000/api/v1
+VITE_API_URL=http://localhost:8000/api/v1
 ```
 
 Execute o servidor de desenvolvimento:
@@ -161,6 +163,7 @@ http://localhost:5173
 ```
 
 Para testar login e chamados, a API precisa estar rodando localmente ou hospedada.
+Para teste local com cookie de sessao, prefira acessar tudo por `localhost`: frontend em `http://localhost:5173` e API em `http://localhost:8000`. Se misturar `localhost` e `127.0.0.1`, alguns navegadores podem nao enviar o cookie corretamente.
 
 ## Build de producao
 

@@ -2454,6 +2454,67 @@ button.small {
   text-align: right;
 }
 
+.email-verification-panel {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  border-color: rgba(127, 159, 63, 0.32);
+  background:
+    linear-gradient(135deg, rgba(246, 250, 242, 0.98), rgba(255, 255, 255, 0.96)),
+    var(--surface);
+}
+
+.email-verification-panel h3,
+.email-verification-panel p {
+  margin-bottom: 0;
+}
+
+.verification-inline-form {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(110px, 140px) auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.verification-inline-form .code-timer,
+.verification-inline-form input,
+.verification-inline-form button {
+  margin: 0;
+}
+
+.ticket-verification-gate {
+  width: min(100%, 760px);
+  max-width: 760px;
+}
+
+.health-form-card[aria-disabled="true"] {
+  opacity: 0.72;
+}
+
+.email-verified-pill {
+  width: fit-content;
+  display: block;
+  margin-top: 4px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.email-verified-pill.is-ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.email-verified-pill.is-pending {
+  background: #fff7ed;
+  color: #9a4b16;
+}
+
 .change-request {
   width: fit-content;
   margin: -4px 0 10px;
@@ -2923,6 +2984,17 @@ button.small {
 
   .profile-page .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .email-verification-panel,
+  .verification-inline-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .verification-inline-form .code-timer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .ticket-create-page {

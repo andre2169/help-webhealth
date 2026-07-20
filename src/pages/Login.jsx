@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import PasswordField from "../components/PasswordField";
 import { confirmAccountRecovery, requestAccountRecovery } from "../api/api";
@@ -30,11 +30,12 @@ function verificationMessage(result, fallback) {
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loginNotice, setLoginNotice] = useState("");
+  const [loginNotice, setLoginNotice] = useState(location.state?.notice || "");
   const [submitting, setSubmitting] = useState(false);
 
   const [recoveryEmail, setRecoveryEmail] = useState("");

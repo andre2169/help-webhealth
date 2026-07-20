@@ -27,6 +27,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   const isSupportRole = user?.role === "technician" || user?.role === "admin";
+  const needsEmailVerification = user && !user.email_verified;
 
   useEffect(() => {
     let active = true;
@@ -93,10 +94,12 @@ export default function Home() {
 
     return [
       {
-        icon: "plus",
-        title: "Novo chamado",
-        text: "Registrar uma falha ou solicitação de TI.",
-        to: "/tickets/novo",
+        icon: needsEmailVerification ? "shield" : "plus",
+        title: needsEmailVerification ? "Confirmar email" : "Novo chamado",
+        text: needsEmailVerification
+          ? "Confirme sua conta antes de abrir chamados."
+          : "Registrar uma falha ou solicitação de TI.",
+        to: needsEmailVerification ? "/perfil" : "/tickets/novo",
       },
       {
         icon: "ticket",
@@ -111,7 +114,7 @@ export default function Home() {
         to: "/perfil",
       },
     ];
-  }, [isSupportRole]);
+  }, [isSupportRole, needsEmailVerification]);
 
   return (
     <>
@@ -127,9 +130,9 @@ export default function Home() {
             </p>
           </div>
           <div className="home-hero-actions">
-            <button onClick={() => navigate("/tickets/novo")}>
-              <Icon name="plus" />
-              Novo chamado
+            <button onClick={() => navigate(needsEmailVerification ? "/perfil" : "/tickets/novo")}>
+              <Icon name={needsEmailVerification ? "shield" : "plus"} />
+              {needsEmailVerification ? "Confirmar email" : "Novo chamado"}
             </button>
             <button className="secondary" onClick={() => navigate("/tickets")}>
               <Icon name="ticket" />

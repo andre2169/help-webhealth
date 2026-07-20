@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   confirmEmailChange,
+  confirmEmailVerification,
   confirmPasswordChange,
   requestEmailChange,
+  requestEmailVerification,
   requestPasswordChange,
   updateMe,
 } from "../api/api";
@@ -68,7 +71,8 @@ function formatTimer(seconds) {
 }
 
 export default function Profile() {
-  const { user, refreshUser } = useAuth();
+  const navigate = useNavigate();
+  const { user, refreshUser, logout } = useAuth();
   const initialPhone = parsePhoneValue(user?.phone);
   const [name, setName] = useState(user?.name || "");
   const [phoneCountry, setPhoneCountry] = useState(initialPhone.countryCode);
@@ -105,6 +109,13 @@ export default function Profile() {
   const [error, setError] = useState("");
   const [avatarMessage, setAvatarMessage] = useState("");
   const [avatarError, setAvatarError] = useState("");
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyAwaitingCode, setVerifyAwaitingCode] = useState(false);
+  const [verifyTimeLeft, setVerifyTimeLeft] = useState(0);
+  const [verifyResendLeft, setVerifyResendLeft] = useState(0);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyMessage, setVerifyMessage] = useState("");
+  const [verifyError, setVerifyError] = useState("");
 
   useEffect(() => {
     setName(user?.name || "");
@@ -140,6 +151,17 @@ export default function Profile() {
 
     return () => window.clearInterval(timer);
   }, [passwordAwaitingCode, passwordTimeLeft, passwordResendLeft]);
+
+  useEffect(() => {
+    if (!verifyAwaitingCode || (verifyTimeLeft <= 0 && verifyResendLeft <= 0)) return undefined;
+
+    const timer = window.setInterval(() => {
+      setVerifyTimeLeft((current) => Math.max(0, current - 1));
+      setVerifyResendLeft((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [verifyAwaitingCode, verifyTimeLeft, verifyResendLeft]);
 
   async function saveProfile(event) {
     event.preventDefault();
@@ -198,8 +220,11 @@ export default function Profile() {
       setEmailAwaitingCode(false);
       setEmailTimeLeft(0);
       setEmailResendLeft(0);
-      await refreshUser();
-      setEmailMessage("Email alterado com confirmação.");
+      await logout();
+      navigate("/login", {
+        replace: true,
+        state: { notice: "Email alterado com sucesso. Entre novamente usando o novo email." },
+      });
     } catch (err) {
       setEmailError(err.message);
     } finally {
@@ -245,7 +270,11 @@ export default function Profile() {
       setPasswordAwaitingCode(false);
       setPasswordTimeLeft(0);
       setPasswordResendLeft(0);
-      setPasswordMessage("Senha alterada com confirmação.");
+      await logout();
+      navigate("/login", {
+        replace: true,
+        state: { notice: "Senha alterada com sucesso. Entre novamente usando a nova senha." },
+      });
     } catch (err) {
       setPasswordError(err.message);
     } finally {
@@ -304,6 +333,44 @@ export default function Profile() {
     }
   }
 
+  async function requestVerifyEmailCode() {
+    setVerifyError("");
+    setVerifyMessage("");
+    setVerifyBusy(true);
+    try {
+      const result = await requestEmailVerification();
+      setVerifyAwaitingCode(true);
+      setVerifyCode("");
+      setVerifyTimeLeft(secondsFromVerification(result));
+      setVerifyResendLeft(resendSecondsFromVerification(result));
+      setVerifyMessage(verificationMessage(result, "Código enviado para confirmar seu email."));
+    } catch (err) {
+      setVerifyError(err.message);
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
+
+  async function confirmVerifyEmailCode(event) {
+    event.preventDefault();
+    setVerifyError("");
+    setVerifyMessage("");
+    setVerifyBusy(true);
+    try {
+      await confirmEmailVerification({ code: verifyCode });
+      setVerifyAwaitingCode(false);
+      setVerifyCode("");
+      setVerifyTimeLeft(0);
+      setVerifyResendLeft(0);
+      await refreshUser();
+      setVerifyMessage("Email confirmado. Agora você pode abrir chamados.");
+    } catch (err) {
+      setVerifyError(err.message);
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
+
   return (
     <>
       <Topbar title="Perfil" subtitle="Dados da sua conta" />
@@ -342,6 +409,69 @@ export default function Profile() {
             {avatarMessage && <p className="success compact-feedback">{avatarMessage}</p>}
           </div>
         </section>
+
+        {user && !user.email_verified && (
+          <form className="panel email-verification-panel" onSubmit={confirmVerifyEmailCode}>
+            <div>
+              <h3>
+                <Icon name="shield" />
+                Confirmar email
+              </h3>
+              <p className="muted-note">
+                Confirme o email da conta para abrir chamados e receber códigos de segurança.
+              </p>
+            </div>
+
+            {!verifyAwaitingCode ? (
+              <button type="button" className="secondary" onClick={requestVerifyEmailCode} disabled={verifyBusy}>
+                <Icon name="mail" />
+                {verifyBusy ? "Enviando..." : "Enviar código"}
+              </button>
+            ) : (
+              <div className="verification-inline-form">
+                <div className={`code-timer ${verifyTimeLeft <= 60 ? "is-ending" : ""}`}>
+                  <Icon name="clock" />
+                  <span>{verifyTimeLeft > 0 ? `Expira em ${formatTimer(verifyTimeLeft)}` : "Código expirado"}</span>
+                  <span className="resend-hint">
+                    {verifyResendLeft > 0 ? `Reenvio em ${formatTimer(verifyResendLeft)}` : "Reenvio liberado"}
+                  </span>
+                </div>
+                <input
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={verifyCode}
+                  onChange={(e) => {
+                    setVerifyCode(e.target.value.replace(/\D/g, ""));
+                    setVerifyError("");
+                  }}
+                  placeholder="000000"
+                  autoComplete="one-time-code"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="secondary"
+                  disabled={verifyBusy || verifyTimeLeft <= 0 || verifyCode.length !== 6}
+                >
+                  <Icon name="check" />
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={requestVerifyEmailCode}
+                  disabled={verifyBusy || verifyResendLeft > 0}
+                >
+                  <Icon name="refresh" />
+                  Reenviar
+                </button>
+              </div>
+            )}
+
+            {verifyError && <p className="error compact-feedback">{verifyError}</p>}
+            {verifyMessage && <p className="success compact-feedback">{verifyMessage}</p>}
+          </form>
+        )}
 
         <div className="dashboard-grid">
           <form className="panel" onSubmit={saveProfile}>

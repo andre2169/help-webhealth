@@ -149,10 +149,6 @@ function MetricBlock({ title, data, icon }) {
   );
 }
 
-function sumValues(data = {}) {
-  return Object.values(data).reduce((total, value) => total + Number(value || 0), 0);
-}
-
 function safeReportLabel(value, maxLength = 90) {
   const text = String(value ?? "").trim();
   if (text.length <= maxLength) return text;
@@ -266,8 +262,9 @@ function buildReportDocument({
   slaWithinPercent,
 }) {
   const generatedAt = formatApiDateTime(data.generated_at);
-  const criticalActive = queueSnapshot["Críticos ativos"] || 0;
-  const highPriorityActive = queueSnapshot["Alta prioridade ativa"] || 0;
+  const metrics = data.summary_metrics || {};
+  const criticalActive = metrics.critical_active_total || 0;
+  const highPriorityActive = metrics.high_priority_active_total || 0;
 
   const filtersRows = appliedSummary
     .map(
@@ -551,7 +548,7 @@ function buildReportDocument({
         <h2>Resumo executivo</h2>
         <p class="summary-text">
           Foram analisados ${escapeHtml(totalAnalyzed)} chamados no recorte selecionado. A fila ativa possui
-          ${escapeHtml(activeTotal)} chamados, sendo ${escapeHtml(queueSnapshot["Sem técnico"] || 0)} sem técnico atribuído.
+          ${escapeHtml(activeTotal)} chamados, sendo ${escapeHtml(metrics.unassigned_active_total || 0)} sem técnico atribuído.
           Há ${escapeHtml(criticalActive)} chamados críticos ativos e ${escapeHtml(highPriorityActive)} chamados ativos de alta prioridade.
           Foram registradas ${escapeHtml(reopenEvents)} reaberturas no período.
         </p>
@@ -616,19 +613,17 @@ export default function Reports() {
     };
   }, [appliedFilters]);
 
-  const totalAnalyzed = sumValues(data?.status_counts);
-  const activeTotal =
-    (data?.status_counts?.open || 0) +
-    (data?.status_counts?.reopened || 0) +
-    (data?.status_counts?.in_progress || 0);
-  const completedTotal = (data?.status_counts?.resolved || 0) + (data?.status_counts?.closed || 0);
-  const completedPercent = Math.round((completedTotal / Math.max(1, totalAnalyzed)) * 100);
-  const slaResolvedTotal = data?.sla?.resolved_total || 0;
-  const slaWithinTotal = data?.sla?.within_sla || 0;
-  const slaWithinPercent = Math.round((slaWithinTotal / Math.max(1, slaResolvedTotal)) * 100);
-  const avgResolutionHours = Math.round((data?.sla?.avg_resolution_minutes || 0) / 60);
+  const summaryMetrics = data?.summary_metrics || {};
+  const totalAnalyzed = summaryMetrics.total_analyzed || 0;
+  const activeTotal = summaryMetrics.active_total || 0;
+  const completedTotal = summaryMetrics.completed_total || 0;
+  const completedPercent = summaryMetrics.completed_percent || 0;
+  const slaResolvedTotal = summaryMetrics.sla_resolved_total || 0;
+  const slaWithinTotal = summaryMetrics.sla_within_total || 0;
+  const slaWithinPercent = summaryMetrics.sla_within_percent || 0;
+  const avgResolutionHours = summaryMetrics.avg_resolution_hours || 0;
   const queueSnapshot = data?.queue_snapshot || {};
-  const reopenEvents = data?.reopen_events_count || 0;
+  const reopenEvents = summaryMetrics.reopen_events_count || 0;
 
   const appliedSummary = useMemo(
     () => [
@@ -924,7 +919,7 @@ export default function Reports() {
                   <Icon name="headset" />
                   <span>Sem técnico</span>
                 </div>
-                <strong>{queueSnapshot["Sem técnico"] || 0}</strong>
+                <strong>{summaryMetrics.unassigned_active_total || 0}</strong>
                 <small>Chamados ativos ainda não atribuídos</small>
               </div>
               <div className="insight-card">
