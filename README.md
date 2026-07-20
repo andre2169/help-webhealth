@@ -38,9 +38,11 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Ajustes responsivos para telas intermediarias, tablets e celulares, evitando que cards, tickets e textos longos ultrapassem os blocos.
 - Controle de redirecionamento por perfil.
 - Logout chama a API para revogar o token atual e remove o token local.
+- O JWT fica em `sessionStorage`, nao em `localStorage`; a chave antiga de `localStorage` e removida ao carregar a aplicacao.
 - Servidor estatico de producao inclui headers de seguranca como CSP, X-Frame-Options, nosniff, Referrer-Policy, HSTS e Permissions-Policy.
 - Formatacao de data/hora no fuso `America/Sao_Paulo`.
 - Em 19/07/2026, as dependencias de producao foram verificadas com `npm audit --omit=dev`, sem vulnerabilidades conhecidas no resultado.
+- O repositorio inclui workflow de GitHub Actions para lint, build e `npm audit --omit=dev`.
 
 ## Comunicacao com backend
 
