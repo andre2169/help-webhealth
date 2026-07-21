@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   confirmEmailChange,
   confirmEmailVerification,
@@ -72,7 +72,9 @@ function formatTimer(seconds) {
 
 export default function Profile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, refreshUser, logout } = useAuth();
+  const profileNotice = location.state?.notice || "";
   const initialPhone = parsePhoneValue(user?.phone);
   const [name, setName] = useState(user?.name || "");
   const [phoneCountry, setPhoneCountry] = useState(initialPhone.countryCode);
@@ -355,6 +357,10 @@ export default function Profile() {
     event.preventDefault();
     setVerifyError("");
     setVerifyMessage("");
+    if (verifyCode.length !== 6) {
+      setVerifyError("Digite os 6 números do código recebido por email.");
+      return;
+    }
     setVerifyBusy(true);
     try {
       await confirmEmailVerification({ code: verifyCode });
@@ -375,6 +381,7 @@ export default function Profile() {
     <>
       <Topbar title="Perfil" subtitle="Dados da sua conta" />
       <main className="main profile-page">
+        {profileNotice && <p className="success">{profileNotice}</p>}
         {error && <p className="error">{error}</p>}
         {message && <p className="success">{message}</p>}
 
@@ -422,13 +429,13 @@ export default function Profile() {
               </p>
             </div>
 
-            {!verifyAwaitingCode ? (
-              <button type="button" className="secondary" onClick={requestVerifyEmailCode} disabled={verifyBusy}>
-                <Icon name="mail" />
-                {verifyBusy ? "Enviando..." : "Enviar código"}
-              </button>
-            ) : (
-              <div className="verification-inline-form">
+            <div className="email-verification-actions">
+              {!verifyAwaitingCode && (
+                <p className="field-hint">
+                  Se o código já chegou, digite abaixo. Se não recebeu ou expirou, envie um novo código.
+                </p>
+              )}
+              {verifyAwaitingCode && (
                 <div className={`code-timer ${verifyTimeLeft <= 60 ? "is-ending" : ""}`}>
                   <Icon name="clock" />
                   <span>{verifyTimeLeft > 0 ? `Expira em ${formatTimer(verifyTimeLeft)}` : "Código expirado"}</span>
@@ -436,7 +443,11 @@ export default function Profile() {
                     {verifyResendLeft > 0 ? `Reenvio em ${formatTimer(verifyResendLeft)}` : "Reenvio liberado"}
                   </span>
                 </div>
+              )}
+              <label htmlFor="email-verification-code">Código recebido por email</label>
+              <div className="verification-inline-form email-confirmation-form">
                 <input
+                  id="email-verification-code"
                   inputMode="numeric"
                   maxLength={6}
                   value={verifyCode}
@@ -451,7 +462,7 @@ export default function Profile() {
                 <button
                   type="submit"
                   className="secondary"
-                  disabled={verifyBusy || verifyTimeLeft <= 0 || verifyCode.length !== 6}
+                  disabled={verifyBusy || verifyCode.length !== 6}
                 >
                   <Icon name="check" />
                   Confirmar
@@ -460,13 +471,13 @@ export default function Profile() {
                   type="button"
                   className="ghost"
                   onClick={requestVerifyEmailCode}
-                  disabled={verifyBusy || verifyResendLeft > 0}
+                  disabled={verifyBusy || (verifyAwaitingCode && verifyResendLeft > 0)}
                 >
-                  <Icon name="refresh" />
-                  Reenviar
+                  <Icon name={verifyAwaitingCode ? "refresh" : "mail"} />
+                  {verifyBusy ? "Enviando..." : verifyAwaitingCode ? "Reenviar" : "Enviar código"}
                 </button>
               </div>
-            )}
+            </div>
 
             {verifyError && <p className="error compact-feedback">{verifyError}</p>}
             {verifyMessage && <p className="success compact-feedback">{verifyMessage}</p>}

@@ -68,8 +68,16 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      await login(email, password);
-      navigate("/");
+      const loggedUser = await login(email, password);
+      if (loggedUser && !loggedUser.email_verified) {
+        navigate("/perfil", {
+          state: {
+            notice: "Confirme seu email para liberar a abertura de chamados. Digite o código recebido ou solicite um novo.",
+          },
+        });
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       setError(err.message);
     } finally {

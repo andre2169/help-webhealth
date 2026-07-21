@@ -23,6 +23,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Logo, item Inicio e area do usuario com navegacao direta para inicio/perfil.
 - Perfil com telefone, funcao, setor, unidade e preferencia de notificacao.
 - Alteracao de email e senha em duas etapas, com codigo de verificacao gerado pela API.
+- Contas com email pendente sao direcionadas ao Perfil, onde o campo de codigo fica visivel para confirmar ou reenviar o codigo.
 - Recuperacao de conta pela tela de login, com codigo enviado ao email cadastrado.
 - Links de login, cadastro e recuperacao separados para evitar confusao em telas pequenas.
 - Abertura de chamados com setor, categoria, equipamento, patrimonio, impacto e ate 3 fotos opcionais.

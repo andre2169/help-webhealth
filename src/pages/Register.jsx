@@ -53,7 +53,7 @@ export default function Register() {
         department: validateShortText(department, "Setor", { maxLength: PROFILE_LIMITS.department }),
         unitName: validateShortText(unitName, "Unidade", { maxLength: PROFILE_LIMITS.unitName }),
       });
-      setSuccess("Conta criada. Enviamos um código para confirmar seu email. Entre e conclua a confirmação no perfil.");
+      setSuccess("Conta criada. Enviamos um código para confirmar seu email. Entre na conta e digite o código no Perfil.");
       setTimeout(() => navigate("/login"), 1800);
     } catch (err) {
       setError(err.message);
