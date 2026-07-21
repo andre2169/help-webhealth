@@ -31,6 +31,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Lista de chamados com filtros.
 - Detalhe do chamado com comentarios, timeline e status.
 - Foto de perfil do usuario.
+- Notificacoes internas para tecnicos e administradores quando chamados sao criados ou reabertos.
 - Dashboard e relatorios apenas para tecnicos e administradores.
 - Relatorios com filtros por periodo, status, prioridade, impacto, setor e categoria.
 - Indicadores de volume diario, idade da fila ativa, chamados sem tecnico, reaberturas e solicitantes recorrentes.
@@ -58,6 +59,7 @@ src/api/api.js
 
 Isso mantem o SQLite e as regras de negocio protegidos no backend. O navegador recebe apenas as respostas permitidas pelos endpoints da API.
 Validacoes no frontend existem apenas para orientar o usuario antes do envio. As decisoes sensiveis ficam no backend: autenticacao, autorizacao, status do chamado, SLA, filtros aceitos, limites de upload, confirmacao de email e calculos dos relatorios.
+O mesmo vale para notificacoes: o frontend apenas consulta as notificacoes que a API retorna para o usuario logado. A decisao de quem deve ser avisado fica no backend.
 
 Nao existe conexao do frontend com SQLite, arquivo `.db`, SQLAlchemy ou qualquer credencial de banco. O fluxo correto e sempre:
 
@@ -94,6 +96,20 @@ Administrador:
 - Relatorios
 - Usuarios
 - Perfil
+
+## Notificacoes
+
+Tecnicos e administradores veem um sino na barra superior. Ele mostra chamados novos e chamados reabertos em uma lista curta, com contador de nao lidas e atalho para abrir o chamado.
+
+O frontend consulta:
+
+```text
+GET /api/v1/notifications/
+PATCH /api/v1/notifications/{notification_id}/read
+PATCH /api/v1/notifications/read-all
+```
+
+Essas rotas usam cookie HttpOnly de sessao e nao exigem token salvo no navegador. Usuarios comuns nao recebem a notificacao operacional da fila.
 
 ## Estrutura principal
 

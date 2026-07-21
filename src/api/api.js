@@ -370,6 +370,37 @@ export async function createComment(ticketId, content) {
   return handle(response);
 }
 
+/* ---------- Notificações ---------- */
+export async function getNotifications({ unreadOnly = false, limit = 20 } = {}) {
+  const params = new URLSearchParams();
+  params.append("limit", limit);
+  if (unreadOnly) params.append("unread_only", "true");
+
+  const response = await fetch(`${API_URL}/notifications/?${params.toString()}`, {
+    credentials: "include",
+    headers: getAuthHeaders(),
+  });
+  return handle(response);
+}
+
+export async function markNotificationRead(notificationId) {
+  const response = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: getAuthHeaders(),
+  });
+  return handle(response);
+}
+
+export async function markAllNotificationsRead() {
+  const response = await fetch(`${API_URL}/notifications/read-all`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: getAuthHeaders(),
+  });
+  return handle(response);
+}
+
 /* ---------- Dashboard / Relatórios ---------- */
 export async function getDashboardSummary() {
   const response = await fetch(`${API_URL}/dashboard/summary`, {

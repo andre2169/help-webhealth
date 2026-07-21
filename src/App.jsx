@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import { RequireAuth, RequireRole } from "./components/RequireAuth";
 import AppLayout from "./components/AppLayout";
 import Login from "./pages/Login";
@@ -25,46 +26,48 @@ function PublicOnly({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            <PublicOnly>
-              <Login />
-            </PublicOnly>
-          }
-        />
-        <Route
-          path="/cadastro"
-          element={
-            <PublicOnly>
-              <Register />
-            </PublicOnly>
-          }
-        />
+      <NotificationsProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <PublicOnly>
+                <Login />
+              </PublicOnly>
+            }
+          />
+          <Route
+            path="/cadastro"
+            element={
+              <PublicOnly>
+                <Register />
+              </PublicOnly>
+            }
+          />
 
-        <Route element={<RequireAuth />}>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/tickets" element={<Tickets />} />
-            <Route path="/tickets/novo" element={<CreateTicket />} />
-            <Route path="/tickets/:id" element={<TicketDetail />} />
-            <Route path="/perfil" element={<Profile />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/tickets" element={<Tickets />} />
+              <Route path="/tickets/novo" element={<CreateTicket />} />
+              <Route path="/tickets/:id" element={<TicketDetail />} />
+              <Route path="/perfil" element={<Profile />} />
 
-            <Route element={<RequireRole roles={["technician", "admin"]} />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/atendimento" element={<ServiceDesk />} />
-              <Route path="/relatorios" element={<Reports />} />
-            </Route>
+              <Route element={<RequireRole roles={["technician", "admin"]} />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/atendimento" element={<ServiceDesk />} />
+                <Route path="/relatorios" element={<Reports />} />
+              </Route>
 
-            <Route element={<RequireRole roles={["admin"]} />}>
-              <Route path="/admin/usuarios" element={<AdminUsers />} />
+              <Route element={<RequireRole roles={["admin"]} />}>
+                <Route path="/admin/usuarios" element={<AdminUsers />} />
+              </Route>
             </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }

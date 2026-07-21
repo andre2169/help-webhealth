@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Icon from "./Icon";
+import NotificationCenter from "./NotificationCenter";
 import UserAvatar from "./UserAvatar";
 
 export default function Topbar({ title, subtitle }) {
@@ -23,6 +24,7 @@ export default function Topbar({ title, subtitle }) {
           <Icon name="home" />
           <span>Início</span>
         </Link>
+        <NotificationCenter />
         {user?.name && (
           <Link to="/perfil" className="topbar-user-chip" title="Abrir perfil">
             <UserAvatar user={user} size={32} />

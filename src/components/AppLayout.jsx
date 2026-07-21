@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
+import NotificationToast from "./NotificationToast";
 import { useAuth } from "../context/AuthContext";
 
 export default function AppLayout() {
@@ -11,6 +12,7 @@ export default function AppLayout() {
       <div className="app-body">
         <Outlet />
       </div>
+      <NotificationToast />
     </div>
   );
 }
