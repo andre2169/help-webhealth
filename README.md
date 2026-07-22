@@ -21,7 +21,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Sidebar com navegacao por perfil.
 - Tela de inicio autenticada com atalhos, chamados recentes e orientacoes de uso seguro.
 - Logo, item Inicio e area do usuario com navegacao direta para inicio/perfil.
-- Perfil com telefone, funcao, setor, unidade e preferencia de notificacao.
+- Perfil com telefone brasileiro em DDD + numero, funcao, setor, unidade e preferencia de notificacao.
 - Alteracao de email e senha em duas etapas, com codigo de verificacao gerado pela API.
 - Contas com email pendente sao direcionadas ao Perfil, onde o campo de codigo fica visivel para confirmar ou reenviar o codigo.
 - Recuperacao de conta pela tela de login, com codigo enviado ao email cadastrado.
@@ -62,6 +62,7 @@ src/api/api.js
 Isso mantem o SQLite e as regras de negocio protegidos no backend. O navegador recebe apenas as respostas permitidas pelos endpoints da API.
 Validacoes no frontend existem apenas para orientar o usuario antes do envio. As decisoes sensiveis ficam no backend: autenticacao, autorizacao, status do chamado, SLA, filtros aceitos, limites de upload, confirmacao de email e calculos dos relatorios.
 O mesmo vale para notificacoes: o frontend apenas consulta as notificacoes que a API retorna para o usuario logado. A decisao de quem deve ser avisado fica no backend.
+Campos como telefone tambem sao validados novamente pela API. Na interface, o telefone aceita apenas numeros brasileiros no formato DDD + numero, sem DDI ou `+55`.
 
 Nao existe conexao do frontend com SQLite, arquivo `.db`, SQLAlchemy ou qualquer credencial de banco. O fluxo correto e sempre:
 

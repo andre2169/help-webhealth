@@ -4,14 +4,19 @@ const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:[ '-][A-Za-zÀ-ÖØ-öø-ÿ]+)*$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const DANGEROUS_TEXT_RE = /<|>|javascript\s*:|data\s*:\s*text\/html|on[a-z]+\s*=/i;
 
-export const PHONE_COUNTRIES = [
-  { code: "55", label: "Brasil", hint: "DDD + número", localMin: 10, localMax: 11 },
-  { code: "351", label: "Portugal", hint: "Número local", localMin: 9, localMax: 9 },
-  { code: "1", label: "EUA/Canadá", hint: "Código de área + número", localMin: 10, localMax: 10 },
-  { code: "34", label: "Espanha", hint: "Número local", localMin: 9, localMax: 9 },
-  { code: "39", label: "Itália", hint: "Número local", localMin: 8, localMax: 11 },
-  { code: "44", label: "Reino Unido", hint: "Número local", localMin: 10, localMax: 10 },
-];
+export const BRAZIL_PHONE_HINT = "DDD + número. Ex.: 71999998888";
+export const BRAZIL_PHONE_MAX_LENGTH = 11;
+export const BRAZIL_DDDS = new Set([
+  "11", "12", "13", "14", "15", "16", "17", "18", "19",
+  "21", "22", "24", "27", "28",
+  "31", "32", "33", "34", "35", "37", "38",
+  "41", "42", "43", "44", "45", "46", "47", "48", "49",
+  "51", "53", "54", "55",
+  "61", "62", "63", "64", "65", "66", "67", "68", "69",
+  "71", "73", "74", "75", "77", "79",
+  "81", "82", "83", "84", "85", "86", "87", "88", "89",
+  "91", "92", "93", "94", "95", "96", "97", "98", "99",
+]);
 
 export function onlyDigits(value, maxLength = 15) {
   return String(value || "").replace(/\D/g, "").slice(0, maxLength);
@@ -25,67 +30,47 @@ function hasEmojiOrControl(value) {
   return /[\p{Extended_Pictographic}\p{Cc}\p{Cf}\p{Cs}]/u.test(value);
 }
 
-export function getPhoneCountry(code) {
-  return PHONE_COUNTRIES.find((country) => country.code === String(code)) || PHONE_COUNTRIES[0];
-}
-
 export function parsePhoneValue(value) {
   const raw = String(value || "");
-  const digits = onlyDigits(raw, 15);
+  const digits = onlyDigits(raw, 13);
   if (!digits) {
-    return { countryCode: "55", nationalNumber: "" };
-  }
-
-  const matchedCountry = [...PHONE_COUNTRIES]
-    .sort((a, b) => b.code.length - a.code.length)
-    .find((country) => digits.startsWith(country.code));
-
-  if (!matchedCountry) {
-    return { countryCode: "55", nationalNumber: digits };
-  }
-
-  return {
-    countryCode: matchedCountry.code,
-    nationalNumber: digits.slice(matchedCountry.code.length),
-  };
-}
-
-export function buildPhoneValue(countryCode, nationalNumber) {
-  const local = onlyDigits(nationalNumber, 15);
-  if (!local) return "";
-  return `+${countryCode}${local}`;
-}
-
-export function validatePhone(value, required = false, countryCode = "55") {
-  const phone = onlyDigits(value, 15);
-  if (!phone) {
-    if (required) throw new Error("Informe DDI, DDD e telefone.");
     return "";
   }
 
-  if (countryCode === "55") {
-    if (![10, 11].includes(phone.length)) {
-      throw new Error("Telefone do Brasil deve ter DDD e 10 ou 11 números.");
-    }
-
-    const ddd = Number(phone.slice(0, 2));
-    if (ddd < 11 || ddd > 99 || new Set(phone).size === 1) {
-      throw new Error("Informe um DDD e telefone válidos.");
-    }
-
-    if (phone.length === 11 && phone[2] !== "9") {
-      throw new Error("Celular do Brasil com 11 números deve começar com 9 depois do DDD.");
-    }
-
-    return `+55${phone}`;
+  // Compatibilidade com perfis antigos que foram salvos no formato +55.
+  if (digits.startsWith("55") && [12, 13].includes(digits.length)) {
+    return digits.slice(2);
   }
 
-  const country = getPhoneCountry(countryCode);
-  if (phone.length < country.localMin || phone.length > country.localMax || new Set(phone).size === 1) {
-    throw new Error(`Telefone de ${country.label} deve ter ${country.localMin === country.localMax ? country.localMin : `${country.localMin} a ${country.localMax}`} números.`);
+  return digits.slice(0, BRAZIL_PHONE_MAX_LENGTH);
+}
+
+export function validatePhone(value, required = false) {
+  const raw = String(value || "").trim();
+  const phone = onlyDigits(raw, 13);
+  if (!phone) {
+    if (required) throw new Error("Informe telefone com DDD.");
+    return "";
   }
 
-  return `+${countryCode}${phone}`;
+  if (raw.startsWith("+") || (phone.startsWith("55") && [12, 13].includes(phone.length))) {
+    throw new Error("Use somente DDD + número, sem DDI ou +55.");
+  }
+
+  if (![10, 11].includes(phone.length)) {
+    throw new Error("Telefone deve ter DDD brasileiro e 10 ou 11 números.");
+  }
+
+  const ddd = phone.slice(0, 2);
+  if (!BRAZIL_DDDS.has(ddd) || new Set(phone).size === 1) {
+    throw new Error("Informe um DDD brasileiro e telefone válidos.");
+  }
+
+  if (phone.length === 11 && phone[2] !== "9") {
+    throw new Error("Celular com 11 números deve começar com 9 depois do DDD.");
+  }
+
+  return phone;
 }
 
 export function validateName(value) {

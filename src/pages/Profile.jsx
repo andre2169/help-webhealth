@@ -21,8 +21,8 @@ import {
   saveUserAvatar,
 } from "../utils/avatar";
 import {
-  PHONE_COUNTRIES,
-  getPhoneCountry,
+  BRAZIL_PHONE_HINT,
+  BRAZIL_PHONE_MAX_LENGTH,
   onlyDigits,
   parsePhoneValue,
   validateEmail,
@@ -77,8 +77,7 @@ export default function Profile() {
   const profileNotice = location.state?.notice || "";
   const initialPhone = parsePhoneValue(user?.phone);
   const [name, setName] = useState(user?.name || "");
-  const [phoneCountry, setPhoneCountry] = useState(initialPhone.countryCode);
-  const [phone, setPhone] = useState(initialPhone.nationalNumber);
+  const [phone, setPhone] = useState(initialPhone);
   const [jobTitle, setJobTitle] = useState(user?.job_title || "");
   const [department, setDepartment] = useState(user?.department || "");
   const [unitName, setUnitName] = useState(user?.unit_name || "");
@@ -122,8 +121,7 @@ export default function Profile() {
   useEffect(() => {
     setName(user?.name || "");
     const parsedPhone = parsePhoneValue(user?.phone);
-    setPhoneCountry(parsedPhone.countryCode);
-    setPhone(parsedPhone.nationalNumber);
+    setPhone(parsedPhone);
     setJobTitle(user?.job_title || "");
     setDepartment(user?.department || "");
     setUnitName(user?.unit_name || "");
@@ -172,7 +170,7 @@ export default function Profile() {
     try {
       await updateMe({
         name: validateName(name),
-        phone: validatePhone(phone, false, phoneCountry),
+        phone: validatePhone(phone),
         jobTitle: validateShortText(jobTitle, "Cargo", { maxLength: PROFILE_LIMITS.jobTitle }),
         department: validateShortText(department, "Setor", { maxLength: PROFILE_LIMITS.department }),
         unitName: validateShortText(unitName, "Unidade", { maxLength: PROFILE_LIMITS.unitName }),
@@ -493,23 +491,16 @@ export default function Profile() {
             <label>Nome</label>
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={PROFILE_LIMITS.name} />
             <label>Telefone</label>
-            <div className="phone-grid">
-              <select value={phoneCountry} onChange={(e) => setPhoneCountry(e.target.value)}>
-                {PHONE_COUNTRIES.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    +{country.code} {country.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(onlyDigits(e.target.value, 15))}
-                inputMode="numeric"
-                maxLength={15}
-                placeholder={getPhoneCountry(phoneCountry).hint}
-              />
-            </div>
-            <p className="field-hint">No Brasil, informe DDD + número. Ex.: 21999998888.</p>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(onlyDigits(e.target.value, BRAZIL_PHONE_MAX_LENGTH))}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={BRAZIL_PHONE_MAX_LENGTH}
+              placeholder={BRAZIL_PHONE_HINT}
+              autoComplete="tel-national"
+            />
+            <p className="field-hint">Use apenas números do Brasil: DDD + número, sem +55.</p>
             <label>Cargo ou função</label>
             <input
               value={jobTitle}

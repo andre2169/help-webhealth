@@ -4,8 +4,8 @@ import { registerUser } from "../api/api";
 import Icon from "../components/Icon";
 import PasswordField from "../components/PasswordField";
 import {
-  PHONE_COUNTRIES,
-  getPhoneCountry,
+  BRAZIL_PHONE_HINT,
+  BRAZIL_PHONE_MAX_LENGTH,
   onlyDigits,
   validateEmail,
   validateName,
@@ -27,7 +27,6 @@ export default function Register() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneCountry, setPhoneCountry] = useState("55");
   const [phone, setPhone] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [department, setDepartment] = useState("");
@@ -48,7 +47,7 @@ export default function Register() {
         name: validateName(name),
         email: validateEmail(email),
         password: validatePassword(password),
-        phone: validatePhone(phone, false, phoneCountry),
+        phone: validatePhone(phone),
         jobTitle: validateShortText(jobTitle, "Cargo", { maxLength: PROFILE_LIMITS.jobTitle }),
         department: validateShortText(department, "Setor", { maxLength: PROFILE_LIMITS.department }),
         unitName: validateShortText(unitName, "Unidade", { maxLength: PROFILE_LIMITS.unitName }),
@@ -98,23 +97,16 @@ export default function Register() {
           />
 
           <label>Telefone</label>
-          <div className="phone-grid">
-            <select value={phoneCountry} onChange={(e) => setPhoneCountry(e.target.value)}>
-              {PHONE_COUNTRIES.map((country) => (
-                <option key={country.code} value={country.code}>
-                  +{country.code} {country.label}
-                </option>
-              ))}
-            </select>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(onlyDigits(e.target.value, 15))}
-              inputMode="numeric"
-              maxLength={15}
-              placeholder={getPhoneCountry(phoneCountry).hint}
-            />
-          </div>
-          <p className="field-hint">No Brasil, informe DDD + número. Ex.: 21999998888.</p>
+          <input
+            value={phone}
+            onChange={(e) => setPhone(onlyDigits(e.target.value, BRAZIL_PHONE_MAX_LENGTH))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={BRAZIL_PHONE_MAX_LENGTH}
+            placeholder={BRAZIL_PHONE_HINT}
+            autoComplete="tel-national"
+          />
+          <p className="field-hint">Use apenas números do Brasil: DDD + número, sem +55.</p>
 
           <label>Cargo ou função</label>
           <input
