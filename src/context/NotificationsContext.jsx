@@ -8,7 +8,7 @@ import { useAuth } from "./AuthContext";
 
 const NotificationsContext = createContext(null);
 const SUPPORT_ROLES = ["technician", "admin"];
-const POLL_INTERVAL_MS = 30000;
+const POLL_INTERVAL_MS = 45000;
 
 function canReceiveNotifications(user) {
   return SUPPORT_ROLES.includes(user?.role);
@@ -79,7 +79,9 @@ export function NotificationsProvider({ children }) {
 
     loadNotifications({ showToast: false });
     const timer = window.setInterval(() => {
-      loadNotifications({ showToast: true });
+      if (document.visibilityState === "visible") {
+        loadNotifications({ showToast: true });
+      }
     }, POLL_INTERVAL_MS);
 
     return () => window.clearInterval(timer);

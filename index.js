@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const root = normalize(join(fileURLToPath(new URL(".", import.meta.url)), "dist"));
 const port = Number(process.env.PORT || 4173);
 const fallbackApiOrigin = "https://beckendhelpapihealth.shardweb.app";
+const MAX_URL_LENGTH = 2048;
+const MAX_HEADER_BYTES = 32_000;
+const STATIC_CACHE_SECONDS = 31_536_000;
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -29,6 +32,10 @@ function getApiOrigin() {
 const securityHeaders = {
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
+  "X-DNS-Prefetch-Control": "off",
+  "X-Permitted-Cross-Domain-Policies": "none",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
   "Referrer-Policy": "no-referrer",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
@@ -51,12 +58,49 @@ function getExtension(pathname) {
   return match ? match[0] : ".html";
 }
 
-function sendFile(response, filePath) {
+function getCacheControl(filePath) {
+  if (filePath.includes(`${sep}assets${sep}`)) {
+    return `public, max-age=${STATIC_CACHE_SECONDS}, immutable`;
+  }
+
+  if (getExtension(filePath) === ".html") {
+    return "no-store";
+  }
+
+  return "public, max-age=3600";
+}
+
+function getHeaderBytes(headers) {
+  return Object.entries(headers).reduce((total, [name, value]) => {
+    const joinedValue = Array.isArray(value) ? value.join(",") : String(value || "");
+    return total + Buffer.byteLength(name) + Buffer.byteLength(joinedValue);
+  }, 0);
+}
+
+function sendText(request, response, statusCode, text) {
+  response.writeHead(statusCode, {
+    ...securityHeaders,
+    "Cache-Control": "no-store",
+    "Content-Type": "text/plain; charset=utf-8",
+  });
+  if (request.method === "HEAD") {
+    response.end();
+    return;
+  }
+  response.end(text);
+}
+
+function sendFile(request, response, filePath) {
   const extension = getExtension(filePath);
   response.writeHead(200, {
     ...securityHeaders,
+    "Cache-Control": getCacheControl(filePath),
     "Content-Type": mimeTypes[extension] || "application/octet-stream",
   });
+  if (request.method === "HEAD") {
+    response.end();
+    return;
+  }
   createReadStream(filePath).pipe(response);
 }
 
@@ -82,27 +126,40 @@ function resolvePath(urlPath) {
 }
 
 createServer((request, response) => {
-  if (request.url === "/health") {
-    response.writeHead(200, {
+  if (!["GET", "HEAD"].includes(request.method || "")) {
+    response.writeHead(405, {
       ...securityHeaders,
+      "Allow": "GET, HEAD",
+      "Cache-Control": "no-store",
       "Content-Type": "text/plain; charset=utf-8",
     });
-    response.end("ok\n");
+    response.end("Method not allowed");
+    return;
+  }
+
+  if ((request.url || "").length > MAX_URL_LENGTH) {
+    sendText(request, response, 414, "URI too long");
+    return;
+  }
+
+  if (getHeaderBytes(request.headers) > MAX_HEADER_BYTES) {
+    sendText(request, response, 431, "Request headers too large");
+    return;
+  }
+
+  if (request.url === "/health") {
+    sendText(request, response, 200, "ok\n");
     return;
   }
 
   const filePath = resolvePath(request.url || "/");
 
   if (!filePath || !existsSync(filePath)) {
-    response.writeHead(404, {
-      ...securityHeaders,
-      "Content-Type": "text/plain; charset=utf-8",
-    });
-    response.end("Not found");
+    sendText(request, response, 404, "Not found");
     return;
   }
 
-  sendFile(response, filePath);
+  sendFile(request, response, filePath);
 }).listen(port, "0.0.0.0", () => {
-  console.log(`help-web2 listening on ${port}`);
+  console.log(`helphealth-web listening on ${port}`);
 });

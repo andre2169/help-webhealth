@@ -32,6 +32,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Detalhe do chamado com comentarios, timeline e status.
 - Foto de perfil do usuario.
 - Notificacoes internas para tecnicos e administradores quando chamados sao criados ou reabertos.
+- Polling de notificacoes limitado e pausado quando a aba fica em segundo plano, reduzindo carga desnecessaria na API.
 - Dashboard e relatorios apenas para tecnicos e administradores.
 - Relatorios com filtros por periodo, status, prioridade, impacto, setor e categoria.
 - Indicadores de volume diario, idade da fila ativa, chamados sem tecnico, reaberturas e solicitantes recorrentes.
@@ -43,6 +44,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Logout chama a API para revogar o token atual e limpar o cookie da sessao.
 - Chaves antigas de token em `localStorage`/`sessionStorage` sao removidas ao carregar a aplicacao.
 - Servidor estatico de producao inclui headers de seguranca como CSP, X-Frame-Options, nosniff, Referrer-Policy, HSTS e Permissions-Policy.
+- Servidor estatico aceita apenas `GET` e `HEAD`, limita tamanho de URL/headers e aplica cache longo nos assets gerados pelo build.
 - Formatacao de data/hora no fuso `America/Sao_Paulo`.
 - Em 19/07/2026, as dependencias de producao foram verificadas com `npm audit --omit=dev`, sem vulnerabilidades conhecidas no resultado.
 - O repositorio inclui workflow de GitHub Actions para lint, build e `npm audit --omit=dev`.
