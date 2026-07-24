@@ -136,9 +136,9 @@ export default function Register() {
           <PasswordField
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Mínimo 8 caracteres, com letras e números"
+            placeholder="Mínimo 10 caracteres, com letras e números"
             required
-            minLength={8}
+            minLength={10}
             maxLength={PROFILE_LIMITS.password}
             autoComplete="new-password"
           />

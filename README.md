@@ -18,11 +18,13 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 
 - Login e cadastro.
 - Interface responsiva para desktop e celular.
+- Rolagem das páginas por teclado com setas, PageUp, PageDown, Home e End.
 - Sidebar com navegacao por perfil.
 - Tela de inicio autenticada com atalhos, chamados recentes e orientacoes de uso seguro.
 - Logo, item Inicio e area do usuario com navegacao direta para inicio/perfil.
 - Perfil com telefone brasileiro em DDD + numero, funcao, setor, unidade e preferencia de notificacao.
 - Alteracao de email e senha em duas etapas, com codigo de verificacao gerado pela API.
+- Novas senhas exigem pelo menos 10 caracteres, letras e numeros, alinhado a validacao do backend.
 - Contas com email pendente sao direcionadas ao Perfil, onde o campo de codigo fica visivel para confirmar ou reenviar o codigo.
 - Recuperacao de conta pela tela de login, com codigo enviado ao email cadastrado.
 - Links de login, cadastro e recuperacao separados para evitar confusao em telas pequenas.

@@ -3,6 +3,18 @@ const ASSET_TAG_RE = /^[0-9A-Za-zÀ-ÖØ-öø-ÿ ._\-/]+$/;
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:[ '-][A-Za-zÀ-ÖØ-öø-ÿ]+)*$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const DANGEROUS_TEXT_RE = /<|>|javascript\s*:|data\s*:\s*text\/html|on[a-z]+\s*=/i;
+const COMMON_WEAK_PASSWORDS = new Set([
+  "1234567890",
+  "123456789",
+  "password123",
+  "password1234",
+  "senha12345",
+  "senha123456",
+  "admin12345",
+  "admin123456",
+  "qwerty12345",
+  "qwerty123456",
+]);
 
 export const BRAZIL_PHONE_HINT = "DDD + número. Ex.: 71999998888";
 export const BRAZIL_PHONE_MAX_LENGTH = 11;
@@ -91,14 +103,18 @@ export function validateEmail(value) {
 
 export function validatePassword(value) {
   const password = String(value || "");
-  if (password.length < 8) {
-    throw new Error("A senha deve ter pelo menos 8 caracteres.");
+  if (password.length < 10) {
+    throw new Error("A senha deve ter pelo menos 10 caracteres.");
   }
   if (!/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(password) || !/\d/.test(password)) {
     throw new Error("A senha deve ter letras e números.");
   }
   if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(password)) {
     throw new Error("A senha contém caracteres inválidos.");
+  }
+  const normalized = password.trim().toLowerCase();
+  if (COMMON_WEAK_PASSWORDS.has(normalized) || new Set(normalized).size <= 3) {
+    throw new Error("Escolha uma senha menos previsível.");
   }
   return password;
 }

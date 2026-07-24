@@ -648,8 +648,9 @@ export default function Profile() {
             />
             <label>Nova senha</label>
             <PasswordField
-              minLength={8}
+              minLength={10}
               value={newPassword}
+              placeholder="Mínimo 10 caracteres, com letras e números"
               onChange={(e) => {
                 setNewPassword(e.target.value);
                 setPasswordAwaitingCode(false);

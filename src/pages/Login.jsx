@@ -238,7 +238,8 @@ export default function Login() {
                 setRecoveryPassword(e.target.value);
                 if (recoveryAwaitingCode) resetRecovery(false);
               }}
-              placeholder="Mínimo 8 caracteres"
+              placeholder="Mínimo 10 caracteres"
+              minLength={10}
               autoComplete="new-password"
               disabled={recoveryAwaitingCode}
               required
