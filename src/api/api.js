@@ -3,6 +3,24 @@ const API_URL = (
 ).replace(/\/$/, "");
 const API_BASE_URL = API_URL.replace(/\/api\/v1$/, "");
 const LEGACY_AUTH_TOKEN_KEYS = ["helpwebhealth_token", "token"];
+const GET_CACHE_TTL_MS = 3000;
+const getRequestCache = new Map();
+
+function pruneGetCache(now) {
+  for (const [key, item] of getRequestCache.entries()) {
+    if (!item || item.expiresAt <= now) {
+      getRequestCache.delete(key);
+    }
+  }
+
+  if (getRequestCache.size > 80) {
+    getRequestCache.clear();
+  }
+}
+
+function clearApiGetCache() {
+  getRequestCache.clear();
+}
 
 function removeLegacyAuthToken() {
   try {
@@ -73,6 +91,34 @@ async function handle(response) {
   return data;
 }
 
+async function cachedGetJson(url, { ttl = GET_CACHE_TTL_MS } = {}) {
+  const now = Date.now();
+  pruneGetCache(now);
+
+  const cached = getRequestCache.get(url);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const promise = fetch(url, {
+    credentials: "include",
+    headers: getAuthHeaders(),
+  }).then(handle);
+
+  getRequestCache.set(url, {
+    promise,
+    expiresAt: now + ttl,
+  });
+
+  promise.catch(() => {
+    if (getRequestCache.get(url)?.promise === promise) {
+      getRequestCache.delete(url);
+    }
+  });
+
+  return promise;
+}
+
 /* ---------- Auth ---------- */
 export async function login(email, password) {
   const response = await fetch(`${API_URL}/auth/login`, {
@@ -115,7 +161,9 @@ export async function updateMe({
       avatar_image: avatarImage,
     }),
   });
-  return handle(response);
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 export async function requestPasswordChange({ currentPassword, newPassword }) {
@@ -224,6 +272,7 @@ export async function logout() {
       headers: getAuthHeaders(),
     });
   } finally {
+    clearApiGetCache();
     clearAuthToken();
   }
 }
@@ -282,11 +331,7 @@ export async function getTickets({
   if (sector) params.append("sector", sector);
   if (operationalImpact) params.append("operational_impact", operationalImpact);
 
-  const response = await fetch(`${API_URL}/tickets/?${params.toString()}`, {
-    credentials: "include",
-    headers: getAuthHeaders(),
-  });
-  return handle(response);
+  return cachedGetJson(`${API_URL}/tickets/?${params.toString()}`);
 }
 
 export async function createTicket({
@@ -319,7 +364,9 @@ export async function createTicket({
       issue_images: images,
     }),
   });
-  return handle(response);
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 export async function getTicketById(ticketId) {
@@ -335,7 +382,12 @@ function patchTicket(ticketId, action) {
     method: "PATCH",
     credentials: "include",
     headers: getAuthHeaders(),
-  }).then(handle);
+  })
+    .then(handle)
+    .then((data) => {
+      clearApiGetCache();
+      return data;
+    });
 }
 
 export const assignTicket = (ticketId) => patchTicket(ticketId, "assign");
@@ -349,7 +401,9 @@ export async function deleteTicket(ticketId) {
     credentials: "include",
     headers: getAuthHeaders(),
   });
-  return handle(response);
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 export async function getTicketTimeline(ticketId) {
@@ -367,7 +421,9 @@ export async function createComment(ticketId, content) {
     headers: getAuthHeaders(),
     body: JSON.stringify({ content }),
   });
-  return handle(response);
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 /* ---------- Notificações ---------- */
@@ -376,11 +432,9 @@ export async function getNotifications({ unreadOnly = false, limit = 20 } = {}) 
   params.append("limit", limit);
   if (unreadOnly) params.append("unread_only", "true");
 
-  const response = await fetch(`${API_URL}/notifications/?${params.toString()}`, {
-    credentials: "include",
-    headers: getAuthHeaders(),
+  return cachedGetJson(`${API_URL}/notifications/?${params.toString()}`, {
+    ttl: 5000,
   });
-  return handle(response);
 }
 
 export async function markNotificationRead(notificationId) {
@@ -389,7 +443,9 @@ export async function markNotificationRead(notificationId) {
     credentials: "include",
     headers: getAuthHeaders(),
   });
-  return handle(response);
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 export async function markAllNotificationsRead() {
@@ -398,16 +454,14 @@ export async function markAllNotificationsRead() {
     credentials: "include",
     headers: getAuthHeaders(),
   });
-  return handle(response);
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 /* ---------- Dashboard / Relatórios ---------- */
 export async function getDashboardSummary() {
-  const response = await fetch(`${API_URL}/dashboard/summary`, {
-    credentials: "include",
-    headers: getAuthHeaders(),
-  });
-  return handle(response);
+  return cachedGetJson(`${API_URL}/dashboard/summary`);
 }
 
 export async function getReportsOverview({

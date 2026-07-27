@@ -67,7 +67,7 @@ export default function NotificationCenter() {
     const nextOpen = !open;
     setOpen(nextOpen);
     if (nextOpen) {
-      refresh({ showToast: false });
+      refresh({ showToast: false, force: true });
     }
   }
 

@@ -8,7 +8,8 @@ import { useAuth } from "./AuthContext";
 
 const NotificationsContext = createContext(null);
 const SUPPORT_ROLES = ["technician", "admin"];
-const POLL_INTERVAL_MS = 45000;
+const POLL_INTERVAL_MS = 60000;
+const MIN_REFRESH_INTERVAL_MS = 10000;
 
 function canReceiveNotifications(user) {
   return SUPPORT_ROLES.includes(user?.role);
@@ -23,44 +24,69 @@ export function NotificationsProvider({ children }) {
   const [error, setError] = useState("");
   const seenIdsRef = useRef(new Set());
   const initializedRef = useRef(false);
+  const inFlightRef = useRef(null);
+  const lastLoadedAtRef = useRef(0);
   const enabled = isAuthenticated && canReceiveNotifications(user);
 
   const loadNotifications = useCallback(
-    async ({ showToast = false } = {}) => {
+    async ({ showToast = false, force = false } = {}) => {
       if (!enabled) {
         setItems([]);
         setUnreadCount(0);
         setToastNotification(null);
+        lastLoadedAtRef.current = 0;
         return;
       }
 
-      try {
+      const now = Date.now();
+      const elapsed = now - lastLoadedAtRef.current;
+      if (!force && lastLoadedAtRef.current && elapsed < MIN_REFRESH_INTERVAL_MS) {
+        return;
+      }
+
+      if (inFlightRef.current) {
+        return inFlightRef.current;
+      }
+
+      const request = (async () => {
         setLoading(true);
-        const data = await getNotifications({ limit: 20 });
-        const notifications = Array.isArray(data?.items) ? data.items : [];
-        const nextUnreadCount = Number(data?.unread_count || 0);
+        try {
+          const data = await getNotifications({ limit: 20 });
+          const notifications = Array.isArray(data?.items) ? data.items : [];
+          const nextUnreadCount = Number(data?.unread_count || 0);
 
-        if (initializedRef.current && showToast) {
-          const newestUnread = notifications.find(
-            (notification) =>
-              !notification.is_read && !seenIdsRef.current.has(notification.id)
-          );
-          if (newestUnread) {
-            setToastNotification(newestUnread);
+          if (initializedRef.current && showToast) {
+            const newestUnread = notifications.find(
+              (notification) =>
+                !notification.is_read && !seenIdsRef.current.has(notification.id)
+            );
+            if (newestUnread) {
+              setToastNotification(newestUnread);
+            }
           }
-        }
 
-        notifications.forEach((notification) => {
-          seenIdsRef.current.add(notification.id);
-        });
-        initializedRef.current = true;
-        setItems(notifications);
-        setUnreadCount(nextUnreadCount);
-        setError("");
-      } catch (err) {
-        setError(err.message || "Não foi possível carregar as notificações.");
+          notifications.forEach((notification) => {
+            seenIdsRef.current.add(notification.id);
+          });
+          initializedRef.current = true;
+          lastLoadedAtRef.current = Date.now();
+          setItems(notifications);
+          setUnreadCount(nextUnreadCount);
+          setError("");
+        } catch (err) {
+          setError(err.message || "Não foi possível carregar as notificações.");
+        } finally {
+          setLoading(false);
+        }
+      })();
+
+      inFlightRef.current = request;
+      try {
+        return await request;
       } finally {
-        setLoading(false);
+        if (inFlightRef.current === request) {
+          inFlightRef.current = null;
+        }
       }
     },
     [enabled]
@@ -77,7 +103,7 @@ export function NotificationsProvider({ children }) {
       return undefined;
     }
 
-    loadNotifications({ showToast: false });
+    loadNotifications({ showToast: false, force: true });
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         loadNotifications({ showToast: true });

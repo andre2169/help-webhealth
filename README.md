@@ -35,6 +35,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Foto de perfil do usuario.
 - Notificacoes internas para tecnicos e administradores quando chamados sao criados ou reabertos.
 - Polling de notificacoes limitado e pausado quando a aba fica em segundo plano, reduzindo carga desnecessaria na API.
+- Consultas GET recentes sao deduplicadas por poucos segundos na memoria da aba, evitando chamadas repetidas quando a tela recarrega dados muito rapido.
 - Dashboard e relatorios apenas para tecnicos e administradores.
 - Relatorios com filtros por periodo, status, prioridade, impacto, setor e categoria.
 - Indicadores de volume diario, idade da fila ativa, chamados sem tecnico, reaberturas e solicitantes recorrentes.
