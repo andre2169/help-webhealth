@@ -39,7 +39,7 @@ A proposta e reduzir falhas de comunicacao comuns em ambientes publicos de saude
 - Dashboard e relatorios apenas para tecnicos e administradores.
 - Relatorios com filtros por periodo, status, prioridade, impacto, setor e categoria.
 - Indicadores de volume diario, idade da fila ativa, chamados sem tecnico, reaberturas e solicitantes recorrentes.
-- Geracao de relatorio em PDF pelo recurso de impressao do navegador, com folha centralizada e campos ajustaveis.
+- Relatorio gerencial com download de PDF real gerado pela API, em formato A4 e com layout proprio de documento administrativo.
 - Visualizacao ampliada das fotos anexadas ao chamado, com navegacao entre imagens e controle de zoom.
 - Ajustes responsivos para telas intermediarias, tablets e celulares, evitando que cards, tickets e textos longos ultrapassem os blocos.
 - Controle de redirecionamento por perfil.

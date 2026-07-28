@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getReportsOverview } from "../api/api";
+import { downloadReportsPdf, getReportsOverview } from "../api/api";
 import Icon from "../components/Icon";
 import Topbar from "../components/Topbar";
 import { formatApiDateTime } from "../utils/dateTime";
@@ -210,390 +210,13 @@ function periodLabel(filters) {
   return "Todo o histórico";
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function reportRows(data = {}) {
-  const entries = Object.entries(data);
-  if (entries.length === 0) {
-    return '<tr><td colspan="2" class="empty-row">Sem dados para este recorte.</td></tr>';
-  }
-
-  return entries
-    .map(
-      ([key, value]) =>
-        `<tr><td>${escapeHtml(safeReportLabel(LABELS[key] || key))}</td><td class="num">${escapeHtml(value)}</td></tr>`
-    )
-    .join("");
-}
-
-function reportTable(title, data) {
-  return `
-    <section class="report-section">
-      <h2>${escapeHtml(title)}</h2>
-      <table>
-        <thead>
-          <tr><th>Indicador</th><th>Total</th></tr>
-        </thead>
-        <tbody>${reportRows(data)}</tbody>
-      </table>
-    </section>
-  `;
-}
-
-function buildReportDocument({
-  data,
-  appliedSummary,
-  totalAnalyzed,
-  activeTotal,
-  completedTotal,
-  completedPercent,
-  queueSnapshot,
-  reopenEvents,
-  avgResolutionHours,
-  slaWithinTotal,
-  slaResolvedTotal,
-  slaWithinPercent,
-}) {
-  const generatedAt = formatApiDateTime(data.generated_at);
-  const metrics = data.summary_metrics || {};
-  const criticalActive = metrics.critical_active_total || 0;
-  const highPriorityActive = metrics.high_priority_active_total || 0;
-
-  const filtersRows = appliedSummary
-    .map(
-      (item) =>
-        `<tr><th>${escapeHtml(item.label)}</th><td>${escapeHtml(item.value)}</td></tr>`
-    )
-    .join("");
-
-  const technicianRows = (data.technicians || [])
-    .map(
-      (tech) => `
-        <tr>
-          <td>${escapeHtml(tech.name)}</td>
-          <td class="num">${escapeHtml(tech.assigned_total)}</td>
-          <td class="num">${escapeHtml(tech.resolved_total)}</td>
-          <td class="num">${escapeHtml(tech.closed_total)}</td>
-        </tr>
-      `
-    )
-    .join("");
-
-  const technicianSection =
-    (data.technicians || []).length > 0
-      ? `
-        <section class="report-section full">
-          <h2>Desempenho por técnico</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Técnico</th>
-                <th>Atribuídos</th>
-                <th>Resolvidos</th>
-                <th>Fechados</th>
-              </tr>
-            </thead>
-            <tbody>${technicianRows}</tbody>
-          </table>
-        </section>
-      `
-      : "";
-
-  return `<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <title>HelpWeb Health - Relatório gerencial</title>
-  <style>
-    @page { size: A4; margin: 14mm; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #f4f7f1;
-      color: #182315;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 12px;
-      line-height: 1.45;
-      overflow-x: hidden;
-    }
-    .page {
-      width: min(100%, 210mm);
-      min-height: 297mm;
-      margin: 0 auto;
-      padding: 18mm;
-      background: #fff;
-      overflow: hidden;
-      box-shadow: 0 18px 50px rgba(38, 55, 30, 0.14);
-    }
-    .report-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 24px;
-      padding-bottom: 14px;
-      border-bottom: 2px solid #2f6426;
-    }
-    .eyebrow {
-      margin: 0 0 4px;
-      color: #2f6426;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-    }
-    h1 {
-      margin: 0;
-      font-size: 24px;
-      line-height: 1.1;
-    }
-    .subtitle {
-      margin: 6px 0 0;
-      color: #53604e;
-      max-width: 520px;
-    }
-    .stamp {
-      min-width: 150px;
-      text-align: right;
-      color: #53604e;
-      font-size: 11px;
-    }
-    .stamp strong {
-      display: block;
-      color: #182315;
-      font-size: 12px;
-    }
-    .meta {
-      margin-top: 16px;
-      display: grid;
-      grid-template-columns: 1fr 1.35fr;
-      gap: 14px;
-    }
-    .box {
-      border: 1px solid #cddac7;
-      border-radius: 8px;
-      padding: 12px;
-      background: #fbfdf8;
-    }
-    h2 {
-      margin: 0 0 8px;
-      color: #1c2b17;
-      font-size: 14px;
-    }
-    .filters-table th,
-    .filters-table td {
-      padding: 4px 0;
-      border: 0;
-      text-align: left;
-      vertical-align: top;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
-    .filters-table th {
-      width: 88px;
-      color: #2f6426;
-      font-size: 10px;
-      text-transform: uppercase;
-    }
-    .summary-text {
-      margin: 0;
-      color: #3f4d3a;
-    }
-    .kpis {
-      margin-top: 14px;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-    }
-    .kpi {
-      border: 1px solid #d8e1d3;
-      border-radius: 8px;
-      padding: 10px;
-      background: #fff;
-    }
-    .kpi span {
-      display: block;
-      color: #53604e;
-      font-size: 9.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .kpi strong {
-      display: block;
-      margin-top: 6px;
-      color: #2f6426;
-      font-size: 22px;
-      line-height: 1;
-    }
-    .kpi small {
-      display: block;
-      margin-top: 6px;
-      color: #53604e;
-      font-size: 10px;
-    }
-    .sections {
-      margin-top: 16px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    .report-section {
-      break-inside: avoid;
-      border: 1px solid #d8e1d3;
-      border-radius: 8px;
-      padding: 12px;
-    }
-    .report-section.full {
-      grid-column: 1 / -1;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th,
-    td {
-      padding: 7px 6px;
-      border-bottom: 1px solid #e5ece0;
-      text-align: left;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
-    thead th {
-      color: #53604e;
-      background: #f2f6ee;
-      font-size: 10px;
-      text-transform: uppercase;
-    }
-    tbody tr:last-child td {
-      border-bottom: 0;
-    }
-    .num {
-      width: 80px;
-      text-align: right;
-      font-weight: 700;
-      color: #2f6426;
-      white-space: nowrap;
-    }
-    .empty-row {
-      color: #6b7665;
-      text-align: center;
-    }
-    .actions {
-      position: sticky;
-      top: 0;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      padding: 10px;
-      background: #f4f7f1;
-    }
-    .actions button {
-      border: 0;
-      border-radius: 6px;
-      padding: 9px 14px;
-      background: #2f6426;
-      color: #fff;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .footer {
-      margin-top: 16px;
-      padding-top: 10px;
-      border-top: 1px solid #d8e1d3;
-      color: #6b7665;
-      font-size: 10px;
-    }
-    @media print {
-      body { background: #fff; }
-      .page {
-        width: 100%;
-        max-width: none;
-        min-height: auto;
-        margin: 0;
-        padding: 0;
-        box-shadow: none;
-      }
-      .actions { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <div class="actions">
-    <button onclick="window.print()">Salvar como PDF</button>
-  </div>
-  <main class="page">
-    <header class="report-header">
-      <div>
-        <p class="eyebrow">HelpWeb Health</p>
-        <h1>Relatório gerencial de chamados</h1>
-        <p class="subtitle">Indicadores de suporte técnico para acompanhamento da operação de TI em ambiente de saúde.</p>
-      </div>
-      <div class="stamp">
-        <strong>Gerado em</strong>
-        ${escapeHtml(generatedAt)}
-      </div>
-    </header>
-
-    <section class="meta">
-      <div class="box">
-        <h2>Filtros aplicados</h2>
-        <table class="filters-table"><tbody>${filtersRows}</tbody></table>
-      </div>
-      <div class="box">
-        <h2>Resumo executivo</h2>
-        <p class="summary-text">
-          Foram analisados ${escapeHtml(totalAnalyzed)} chamados no recorte selecionado. A fila ativa possui
-          ${escapeHtml(activeTotal)} chamados, sendo ${escapeHtml(metrics.unassigned_active_total || 0)} sem técnico atribuído.
-          Há ${escapeHtml(criticalActive)} chamados críticos ativos e ${escapeHtml(highPriorityActive)} chamados ativos de alta prioridade.
-          Foram registradas ${escapeHtml(reopenEvents)} reaberturas no período.
-        </p>
-      </div>
-    </section>
-
-    <section class="kpis">
-      <article class="kpi"><span>Total analisado</span><strong>${escapeHtml(totalAnalyzed)}</strong><small>Chamados no recorte</small></article>
-      <article class="kpi"><span>Fila ativa</span><strong>${escapeHtml(activeTotal)}</strong><small>Abertos, reabertos ou em andamento</small></article>
-      <article class="kpi"><span>Concluídos</span><strong>${escapeHtml(completedTotal)}</strong><small>${escapeHtml(completedPercent)}% do total</small></article>
-      <article class="kpi"><span>SLA vencido</span><strong>${escapeHtml(data.sla?.overdue || 0)}</strong><small>Ativos fora do prazo</small></article>
-      <article class="kpi"><span>Sem técnico</span><strong>${escapeHtml(queueSnapshot["Sem técnico"] || 0)}</strong><small>Aguardando atribuição</small></article>
-      <article class="kpi"><span>Reaberturas</span><strong>${escapeHtml(reopenEvents)}</strong><small>Eventos no recorte</small></article>
-      <article class="kpi"><span>Tempo médio</span><strong>${escapeHtml(avgResolutionHours)}h</strong><small>Média de resolução</small></article>
-      <article class="kpi"><span>SLA cumprido</span><strong>${escapeHtml(slaWithinTotal)}/${escapeHtml(slaResolvedTotal)}</strong><small>${escapeHtml(slaWithinPercent)}% dos resolvidos</small></article>
-    </section>
-
-    <section class="sections">
-      ${reportTable("Por status", data.status_counts)}
-      ${reportTable("Por impacto", data.impact_counts)}
-      ${reportTable("Por setor", data.sector_counts)}
-      ${reportTable("Por categoria", data.category_counts)}
-      ${reportTable("Equipamentos recorrentes", data.equipment_counts)}
-      ${reportTable("Por prioridade", data.priority_counts)}
-      ${reportTable("Evolução por dia", data.daily_counts)}
-      ${reportTable("Idade da fila ativa", data.active_age_counts)}
-      ${reportTable("Situação da fila", data.queue_snapshot)}
-      ${reportTable("Solicitantes recorrentes", data.requester_counts)}
-      ${technicianSection}
-    </section>
-
-    <footer class="footer">
-      Documento gerado pelo HelpWeb Health. O relatório apresenta apenas indicadores de suporte técnico e não deve conter dados de pacientes.
-    </footer>
-  </main>
-</body>
-</html>`;
-}
-
 export default function Reports() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -674,36 +297,26 @@ export default function Reports() {
     setAppliedFilters(EMPTY_FILTERS);
   }
 
-  function exportPdf() {
-    if (!data) return;
+  async function exportPdf() {
+    if (!data || exportingPdf) return;
 
-    const reportWindow = window.open("", "_blank");
-    if (!reportWindow) {
-      window.print();
-      return;
+    setError("");
+    setExportingPdf(true);
+    try {
+      const { blob, fileName } = await downloadReportsPdf(appliedFilters);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setError(err.message || "Não foi possível gerar o PDF do relatório.");
+    } finally {
+      setExportingPdf(false);
     }
-
-    reportWindow.opener = null;
-    reportWindow.document.open();
-    reportWindow.document.write(
-      buildReportDocument({
-        data,
-        appliedSummary,
-        totalAnalyzed,
-        activeTotal,
-        completedTotal,
-        completedPercent,
-        queueSnapshot,
-        reopenEvents,
-        avgResolutionHours,
-        slaWithinTotal,
-        slaResolvedTotal,
-        slaWithinPercent,
-      })
-    );
-    reportWindow.document.close();
-    reportWindow.focus();
-    window.setTimeout(() => reportWindow.print(), 250);
   }
 
   useEffect(() => {
@@ -726,10 +339,12 @@ export default function Reports() {
             </h3>
             <p>Analise chamados por período, setor, categoria, status e impacto operacional.</p>
           </div>
-          <button type="button" className="secondary" onClick={exportPdf} disabled={!data}>
-            <Icon name="save" />
-            Gerar PDF
-          </button>
+          <div className="report-toolbar-actions">
+            <button type="button" onClick={exportPdf} disabled={!data || exportingPdf}>
+              <Icon name="save" />
+              {exportingPdf ? "Gerando..." : "Baixar PDF"}
+            </button>
+          </div>
         </section>
 
         <form className="filters report-filters no-print" onSubmit={handleSubmit}>

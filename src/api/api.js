@@ -69,6 +69,26 @@ function getAuthHeaders() {
   };
 }
 
+function buildReportsQuery({
+  startDate = "",
+  endDate = "",
+  status = "",
+  priority = "",
+  category = "",
+  sector = "",
+  operationalImpact = "",
+} = {}) {
+  const params = new URLSearchParams();
+  if (startDate) params.append("start_date", startDate);
+  if (endDate) params.append("end_date", endDate);
+  if (status) params.append("status", status);
+  if (priority) params.append("priority", priority);
+  if (category) params.append("category", category);
+  if (sector) params.append("sector", sector);
+  if (operationalImpact) params.append("operational_impact", operationalImpact);
+  return params.toString();
+}
+
 async function handle(response) {
   const isNoContent = response.status === 204;
   const data = isNoContent ? null : await response.json().catch(() => null);
@@ -473,21 +493,40 @@ export async function getReportsOverview({
   sector = "",
   operationalImpact = "",
 } = {}) {
-  const params = new URLSearchParams();
-  if (startDate) params.append("start_date", startDate);
-  if (endDate) params.append("end_date", endDate);
-  if (status) params.append("status", status);
-  if (priority) params.append("priority", priority);
-  if (category) params.append("category", category);
-  if (sector) params.append("sector", sector);
-  if (operationalImpact) params.append("operational_impact", operationalImpact);
-
-  const query = params.toString();
+  const query = buildReportsQuery({
+    startDate,
+    endDate,
+    status,
+    priority,
+    category,
+    sector,
+    operationalImpact,
+  });
   const response = await fetch(`${API_URL}/reports/overview${query ? `?${query}` : ""}`, {
     credentials: "include",
     headers: getAuthHeaders(),
   });
   return handle(response);
+}
+
+export async function downloadReportsPdf(filters = {}) {
+  const query = buildReportsQuery(filters);
+  const response = await fetch(`${API_URL}/reports/overview.pdf${query ? `?${query}` : ""}`, {
+    credentials: "include",
+    headers: { Accept: "application/pdf" },
+  });
+
+  if (!response.ok) {
+    await handle(response);
+  }
+
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  const fileName =
+    filenameMatch?.[1] || `helpweb-health-relatorio-${new Date().toISOString().slice(0, 10)}.pdf`;
+  const blob = await response.blob();
+
+  return { blob, fileName };
 }
 
 /* ---------- Admin ---------- */

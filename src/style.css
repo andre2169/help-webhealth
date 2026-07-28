@@ -1029,6 +1029,14 @@ button.small {
   font-size: 13px;
 }
 
+.report-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .report-filters {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px 18px;
@@ -3457,6 +3465,12 @@ button.notification-toast-close:hover {
 
   .report-toolbar button {
     width: 100%;
+  }
+
+  .report-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .report-period-presets {
