@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { downloadReportsPdf, getReportsOverview } from "../api/api";
 import Icon from "../components/Icon";
+import CollapsiblePanel from "../components/CollapsiblePanel";
 import Topbar from "../components/Topbar";
+import { useAuth } from "../context/AuthContext";
 import { formatApiDateTime } from "../utils/dateTime";
 import { validateShortText } from "../utils/validation";
 
@@ -88,6 +90,14 @@ const REPORT_LIMITS = {
   rangeDays: 366,
 };
 
+const REPORT_BREAKDOWNS = [
+  { key: "status_counts", label: "Status" },
+  { key: "priority_counts", label: "Prioridade" },
+  { key: "impact_counts", label: "Impacto" },
+  { key: "sector_counts", label: "Setor" },
+  { key: "category_counts", label: "Categoria" },
+];
+
 function toInputDate(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -127,25 +137,57 @@ function formatInputDate(value) {
   return `${day}/${month}/${year}`;
 }
 
-function MetricBlock({ title, data, icon }) {
-  const entries = Object.entries(data || {});
+function MetricRows({ data, preserveOrder = false, initialLimit = 6, maxItems = 50, latest = false }) {
+  const [expanded, setExpanded] = useState(false);
+  const allEntries = Object.entries(data || {})
+    .map(([key, value]) => [key, Number(value) || 0])
+    .filter(([, value]) => value > 0);
+
+  if (!preserveOrder) {
+    allEntries.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+  }
+
+  const entries = allEntries.length > maxItems
+    ? (latest ? allEntries.slice(-maxItems) : allEntries.slice(0, maxItems))
+    : allEntries;
+  const visibleEntries = expanded ? entries : entries.slice(0, initialLimit);
+  const maxValue = entries.reduce((max, [, value]) => Math.max(max, value), 1);
+
+  if (!entries.length) {
+    return <p className="report-empty">Sem dados para este recorte.</p>;
+  }
 
   return (
-    <section className="panel report-panel">
-      <h3>
-        <Icon name={icon} />
-        {title}
-      </h3>
-      <div className="metric-list">
-        {entries.length === 0 && <p className="empty-metric">Sem dados para este recorte.</p>}
-        {entries.map(([key, value]) => (
-          <div className="metric-row" key={key}>
+    <div className="report-metric-list">
+      {visibleEntries.map(([key, value]) => (
+        <div className="report-metric-row" key={key}>
+          <div className="report-metric-copy">
             <span>{safeReportLabel(LABELS[key] || key)}</span>
             <strong>{value}</strong>
           </div>
-        ))}
-      </div>
-    </section>
+          <div className="report-metric-track" aria-hidden="true">
+            <span style={{ width: `${Math.max(3, (value / maxValue) * 100)}%` }} />
+          </div>
+        </div>
+      ))}
+      {entries.length > initialLimit && (
+        <button
+          type="button"
+          className="report-show-more"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Mostrar menos" : `Ver mais (${entries.length})`}
+        </button>
+      )}
+      {allEntries.length > entries.length && (
+        <p className="report-metric-note">
+          {latest
+            ? `Exibindo os ${entries.length} dias mais recentes.`
+            : `Exibindo os ${entries.length} itens de maior volume entre ${allEntries.length}.`}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -211,12 +253,16 @@ function periodLabel(filters) {
 }
 
 export default function Reports() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const panelScope = String(user?.id ?? "session");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [activeBreakdown, setActiveBreakdown] = useState("status_counts");
 
   useEffect(() => {
     let active = true;
@@ -245,7 +291,6 @@ export default function Reports() {
   const slaWithinTotal = summaryMetrics.sla_within_total || 0;
   const slaWithinPercent = summaryMetrics.sla_within_percent || 0;
   const avgResolutionHours = summaryMetrics.avg_resolution_hours || 0;
-  const queueSnapshot = data?.queue_snapshot || {};
   const reopenEvents = summaryMetrics.reopen_events_count || 0;
 
   const appliedSummary = useMemo(
@@ -258,6 +303,9 @@ export default function Reports() {
       { label: "Categoria", value: appliedFilters.category || "Todas" },
     ],
     [appliedFilters]
+  );
+  const visibleAppliedSummary = appliedSummary.filter(
+    (item, index) => index === 0 || !["Todos", "Todas"].includes(item.value)
   );
 
   function updateFilter(field, value) {
@@ -329,141 +377,171 @@ export default function Reports() {
 
   return (
     <>
-      <Topbar title="Relatórios" subtitle="Indicadores de suporte técnico em instituições de saúde" />
+      <Topbar
+        title={isAdmin ? "Relatórios gerais" : "Meus relatórios"}
+        subtitle={isAdmin ? "Indicadores de toda a operação" : "Indicadores dos chamados atribuídos a você"}
+      />
       <main className="main report-page">
-        <section className="panel report-toolbar no-print">
-          <div>
-            <h3>
-              <Icon name="filter" />
-              Filtros do relatório
-            </h3>
-            <p>Analise chamados por período, setor, categoria, status e impacto operacional.</p>
-          </div>
-          <div className="report-toolbar-actions">
+        <CollapsiblePanel
+          storageKey="reports.filters"
+          scope={panelScope}
+          title="Filtros do relatório"
+          className="panel report-controls no-print"
+          headerClassName="report-controls-heading"
+          heading={(
+            <div>
+              <span className="report-eyebrow">ANÁLISE OPERACIONAL</span>
+              <h2>{isAdmin ? "Relatórios gerais" : "Meus relatórios"}</h2>
+              <p>
+                {isAdmin
+                  ? "Acompanhe volume, fila, prazos e recorrências da operação."
+                  : "Acompanhe seus atendimentos, prazos e recorrências."}
+              </p>
+            </div>
+          )}
+          actions={(
             <button type="button" onClick={exportPdf} disabled={!data || exportingPdf}>
               <Icon name="save" />
-              {exportingPdf ? "Gerando..." : "Baixar PDF"}
+              {exportingPdf ? "Gerando PDF..." : "Baixar PDF"}
             </button>
-          </div>
-        </section>
+          )}
+        >
 
-        <form className="filters report-filters no-print" onSubmit={handleSubmit}>
-          <div className="report-period-presets">
-            <label>Período rápido</label>
-            <div>
-              <button type="button" className="secondary small" onClick={() => applyPreset("7d")}>
-                7 dias
-              </button>
-              <button type="button" className="secondary small" onClick={() => applyPreset("30d")}>
-                30 dias
-              </button>
-              <button type="button" className="secondary small" onClick={() => applyPreset("month")}>
-                Mês atual
-              </button>
+          <form className="report-filter-form" onSubmit={handleSubmit}>
+            <div className="report-filter-main">
+              <fieldset className="report-period-choice">
+                <legend>Período rápido</legend>
+                <div>
+                  <button type="button" className="secondary small" onClick={() => applyPreset("7d")}>
+                    7 dias
+                  </button>
+                  <button type="button" className="secondary small" onClick={() => applyPreset("30d")}>
+                    30 dias
+                  </button>
+                  <button type="button" className="secondary small" onClick={() => applyPreset("month")}>
+                    Mês atual
+                  </button>
+                </div>
+              </fieldset>
+
+              <div className="report-date-fields">
+                <label htmlFor="report-start-date">
+                  Data inicial
+                  <input
+                    id="report-start-date"
+                    type="date"
+                    value={filters.startDate}
+                    onChange={(e) => updateFilter("startDate", e.target.value)}
+                    max={today()}
+                  />
+                </label>
+                <label htmlFor="report-end-date">
+                  Data final
+                  <input
+                    id="report-end-date"
+                    type="date"
+                    value={filters.endDate}
+                    onChange={(e) => updateFilter("endDate", e.target.value)}
+                    max={today()}
+                  />
+                </label>
+              </div>
+
+              <div className="report-filter-actions">
+                <button type="submit">
+                  <Icon name="filter" />
+                  Aplicar filtros
+                </button>
+                <button type="button" className="secondary" onClick={clearFilters}>
+                  Limpar
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label>Data inicial</label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => updateFilter("startDate", e.target.value)}
-              max={today()}
-            />
-          </div>
-
-          <div>
-            <label>Data final</label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => updateFilter("endDate", e.target.value)}
-              max={today()}
-            />
-          </div>
-
-          <div>
-            <label>Status</label>
-            <select value={filters.status} onChange={(e) => updateFilter("status", e.target.value)}>
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value || "all"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label>Prioridade</label>
-            <select
-              value={filters.priority}
-              onChange={(e) => updateFilter("priority", e.target.value)}
-            >
-              {PRIORITY_OPTIONS.map((option) => (
-                <option key={option.value || "all"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label>Impacto</label>
-            <select
-              value={filters.operationalImpact}
-              onChange={(e) => updateFilter("operationalImpact", e.target.value)}
-            >
-              {IMPACT_OPTIONS.map((option) => (
-                <option key={option.value || "all"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label>Setor</label>
-            <input
-              list="report-sector-options"
-              value={filters.sector}
-              onChange={(e) => updateFilter("sector", e.target.value)}
-              placeholder="Todos ou digite um setor"
-              maxLength={REPORT_LIMITS.sector}
-            />
-            <datalist id="report-sector-options">
-              {SECTOR_OPTIONS.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-
-          <div>
-            <label>Categoria</label>
-            <input
-              list="report-category-options"
-              value={filters.category}
-              onChange={(e) => updateFilter("category", e.target.value)}
-              placeholder="Todas ou digite uma categoria"
-              maxLength={REPORT_LIMITS.category}
-            />
-            <datalist id="report-category-options">
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className="filters-actions">
-            <button type="submit">
-              <Icon name="filter" />
-              Aplicar
-            </button>
-            <button type="button" className="secondary" onClick={clearFilters}>
-              Limpar
-            </button>
-          </div>
-        </form>
+            <details className="report-advanced-filters">
+              <summary>
+                <Icon name="filter" />
+                Filtros adicionais
+              </summary>
+              <div className="report-advanced-grid">
+                <label htmlFor="report-status">
+                  Status
+                  <select
+                    id="report-status"
+                    value={filters.status}
+                    onChange={(e) => updateFilter("status", e.target.value)}
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label htmlFor="report-priority">
+                  Prioridade
+                  <select
+                    id="report-priority"
+                    value={filters.priority}
+                    onChange={(e) => updateFilter("priority", e.target.value)}
+                  >
+                    {PRIORITY_OPTIONS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label htmlFor="report-impact">
+                  Impacto
+                  <select
+                    id="report-impact"
+                    value={filters.operationalImpact}
+                    onChange={(e) => updateFilter("operationalImpact", e.target.value)}
+                  >
+                    {IMPACT_OPTIONS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label htmlFor="report-sector">
+                  Setor
+                  <input
+                    id="report-sector"
+                    list="report-sector-options"
+                    value={filters.sector}
+                    onChange={(e) => updateFilter("sector", e.target.value)}
+                    placeholder="Todos os setores"
+                    maxLength={REPORT_LIMITS.sector}
+                  />
+                  <datalist id="report-sector-options">
+                    {SECTOR_OPTIONS.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                </label>
+                <label htmlFor="report-category">
+                  Categoria
+                  <input
+                    id="report-category"
+                    list="report-category-options"
+                    value={filters.category}
+                    onChange={(e) => updateFilter("category", e.target.value)}
+                    placeholder="Todas as categorias"
+                    maxLength={REPORT_LIMITS.category}
+                  />
+                  <datalist id="report-category-options">
+                    {CATEGORY_OPTIONS.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                </label>
+              </div>
+            </details>
+          </form>
+        </CollapsiblePanel>
 
         {error && <p className="error">{error}</p>}
         {loading && <p className="loading-line">Carregando relatórios…</p>}
@@ -475,132 +553,169 @@ export default function Reports() {
               <p>Relatório de chamados de suporte técnico</p>
             </div>
 
-            <section className="panel report-summary">
-              <div>
-                <h3>
-                  <Icon name="reports" />
-                  Recorte do relatório
-                </h3>
-                <p>
-                  Gerado em {formatApiDateTime(data.generated_at)}. Os números abaixo consideram
-                  apenas os filtros aplicados.
-                </p>
-              </div>
+            <CollapsiblePanel
+              storageKey="reports.applied-filters"
+              scope={panelScope}
+              title="Recorte aplicado"
+              className="panel report-summary"
+              headingClassName="report-summary-heading"
+              heading={(
+                <div>
+                  <h3>
+                    <Icon name="reports" />
+                    Recorte aplicado
+                  </h3>
+                  <p>Atualizado em {formatApiDateTime(data.generated_at)}</p>
+                </div>
+              )}
+            >
               <dl className="report-filter-summary">
-                {appliedSummary.map((item) => (
+                <div className="report-period-summary">
+                  <dt>PERÍODO</dt>
+                  <dd>{periodLabel(appliedFilters)}</dd>
+                </div>
+                {visibleAppliedSummary.slice(1).map((item) => (
                   <div key={item.label}>
                     <dt>{item.label}</dt>
                     <dd>{item.value}</dd>
                   </div>
                 ))}
               </dl>
-            </section>
+            </CollapsiblePanel>
 
-            <div className="insight-grid">
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="chart" />
-                  <span>Total analisado</span>
-                </div>
-                <strong>{totalAnalyzed}</strong>
-                <small>Chamados no recorte atual</small>
-              </div>
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="activity" />
-                  <span>Fila ativa</span>
-                </div>
-                <strong>{activeTotal}</strong>
-                <small>Abertos, reabertos e em andamento</small>
-              </div>
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="check" />
-                  <span>Concluídos</span>
-                </div>
-                <strong>{completedTotal}</strong>
-                <small>{completedPercent}% do total analisado</small>
-              </div>
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="alert" />
-                  <span>SLA vencido</span>
-                </div>
-                <strong>{data.sla?.overdue || 0}</strong>
-                <small>Chamados ativos fora do prazo</small>
-              </div>
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="headset" />
-                  <span>Sem técnico</span>
-                </div>
-                <strong>{summaryMetrics.unassigned_active_total || 0}</strong>
-                <small>Chamados ativos ainda não atribuídos</small>
-              </div>
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="refresh" />
-                  <span>Reaberturas</span>
-                </div>
-                <strong>{reopenEvents}</strong>
-                <small>Eventos de reabertura no recorte</small>
-              </div>
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="clock" />
-                  <span>Tempo médio</span>
-                </div>
-                <strong>{avgResolutionHours}h</strong>
-                <small>Média de resolução dos chamados</small>
-              </div>
-              <div className="insight-card">
-                <div className="insight-card-head">
-                  <Icon name="check" />
-                  <span>SLA cumprido</span>
-                </div>
-                <strong>
-                  {slaWithinTotal}/{slaResolvedTotal}
-                </strong>
-                <small>{slaWithinPercent}% dos chamados resolvidos</small>
-              </div>
-            </div>
-
-            <div className="dashboard-grid">
-              <MetricBlock title="Por status" data={data.status_counts} icon="activity" />
-              <MetricBlock title="Por impacto" data={data.impact_counts} icon="alert" />
-              <MetricBlock title="Por setor" data={data.sector_counts} icon="folder" />
-              <MetricBlock title="Por categoria" data={data.category_counts} icon="folder" />
-              <MetricBlock title="Equipamentos recorrentes" data={data.equipment_counts} icon="list" />
-              <MetricBlock title="Por prioridade" data={data.priority_counts} icon="alert" />
-              <MetricBlock title="Evolução por dia" data={data.daily_counts} icon="chart" />
-              <MetricBlock title="Idade da fila ativa" data={data.active_age_counts} icon="clock" />
-              <MetricBlock title="Situação da fila" data={data.queue_snapshot} icon="headset" />
-              <MetricBlock title="Solicitantes recorrentes" data={data.requester_counts} icon="user" />
-            </div>
-
-            {(data.technicians || []).length > 0 && (
-              <section className="panel section-gap">
-                <h3>
-                  <Icon name="headset" />
-                  Desempenho por técnico
-                </h3>
-                <div className="report-table">
-                  <div className="report-head">
-                    <span>Técnico</span>
-                    <span>Atribuídos</span>
-                    <span>Resolvidos</span>
-                    <span>Fechados</span>
+            <div className="report-primary-metrics">
+              {[
+                { key: "total", title: "Total analisado", icon: "chart", value: totalAnalyzed, note: "Chamados no período" },
+                { key: "active", title: "Em aberto", icon: "activity", value: activeTotal, note: "Abertos, reabertos ou em andamento" },
+                { key: "completed", title: "Concluídos", icon: "check", value: completedTotal, note: `${completedPercent}% do total` },
+                { key: "sla", title: "SLA vencido", icon: "alert", value: data.sla?.overdue || 0, note: "Atendimentos ativos fora do prazo", className: "report-alert-metric" },
+              ].map((metric) => (
+                <article
+                  key={metric.key}
+                  className={`insight-card ${metric.className || ""}`}
+                >
+                  <div className="insight-card-head">
+                    <Icon name={metric.icon} />
+                    <span>{metric.title}</span>
                   </div>
-                  {data.technicians.map((tech) => (
-                    <div className="report-row" key={tech.id}>
-                      <span>{tech.name}</span>
-                      <span>{tech.assigned_total}</span>
-                      <span>{tech.resolved_total}</span>
-                      <span>{tech.closed_total}</span>
-                    </div>
+                  <strong>{metric.value}</strong>
+                  <small>{metric.note}</small>
+                </article>
+              ))}
+            </div>
+
+            <div className="report-secondary-metrics" aria-label="Indicadores complementares">
+              {[
+                { key: "unassigned", title: "Sem técnico", value: summaryMetrics.unassigned_active_total || 0 },
+                { key: "reopened", title: "Reaberturas", value: reopenEvents },
+                { key: "resolution-time", title: "Tempo médio", value: `${avgResolutionHours}h` },
+                { key: "sla", title: "SLA cumprido", value: `${slaWithinPercent}%`, note: `${slaWithinTotal} de ${slaResolvedTotal} concluídos` },
+              ].map((metric) => (
+                <div
+                  key={metric.key}
+                  className="report-secondary-metric"
+                >
+                  <span>{metric.title}</span>
+                  <strong>{metric.value}</strong>
+                  {metric.note && <small>{metric.note}</small>}
+                </div>
+              ))}
+            </div>
+
+            <CollapsiblePanel
+              storageKey="reports.breakdown"
+              scope={panelScope}
+              title="Distribuição dos chamados"
+              className="panel report-breakdown-panel"
+              headerClassName="report-section-heading"
+              heading={(
+                <div>
+                  <h3>Distribuição dos chamados</h3>
+                  <p>Compare o volume do recorte por dimensão.</p>
+                </div>
+              )}
+              actions={(
+                <div className="report-segmented" aria-label="Dimensão da distribuição">
+                  {REPORT_BREAKDOWNS.map((breakdown) => (
+                    <button
+                      type="button"
+                      key={breakdown.key}
+                      aria-pressed={activeBreakdown === breakdown.key}
+                      onClick={() => setActiveBreakdown(breakdown.key)}
+                    >
+                      {breakdown.label}
+                    </button>
                   ))}
                 </div>
-              </section>
+              )}
+            >
+              <MetricRows data={data[activeBreakdown]} />
+            </CollapsiblePanel>
+
+            <CollapsiblePanel
+              storageKey="reports.supporting-indicators"
+              scope={panelScope}
+              title="Indicadores de apoio"
+              icon="chart"
+              className="panel report-more-metrics"
+            >
+              <div className="report-more-grid">
+                <section>
+                  <h4>Situação da fila</h4>
+                  <MetricRows data={data.queue_snapshot} preserveOrder />
+                </section>
+                <section>
+                  <h4>Idade dos chamados ativos</h4>
+                  <MetricRows data={data.active_age_counts} preserveOrder />
+                </section>
+                <section>
+                  <h4>Equipamentos recorrentes</h4>
+                  <MetricRows data={data.equipment_counts} />
+                </section>
+                <section>
+                  <h4>Evolução por dia</h4>
+                  <MetricRows data={data.daily_counts} preserveOrder initialLimit={14} maxItems={14} latest />
+                </section>
+              </div>
+            </CollapsiblePanel>
+
+            {(data.technicians || []).length > 0 && (
+              <CollapsiblePanel
+                storageKey="reports.team-performance"
+                scope={panelScope}
+                title={isAdmin ? "Atendimentos por técnico" : "Meu atendimento"}
+                className="panel report-team-panel"
+                headerClassName="report-section-heading"
+                heading={(
+                  <div>
+                    <h3>{isAdmin ? "Atendimentos por técnico" : "Meu atendimento"}</h3>
+                    <p>{isAdmin ? "Chamados atribuídos e concluídos no recorte." : "Chamados vinculados ao seu atendimento."}</p>
+                  </div>
+                )}
+              >
+                <div className="report-table-wrap">
+                  <table className="report-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Técnico</th>
+                        <th scope="col">Atribuídos</th>
+                        <th scope="col">Resolvidos</th>
+                        <th scope="col">Fechados</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.technicians.map((tech) => (
+                        <tr key={tech.id}>
+                          <th scope="row">{safeReportLabel(tech.name, 100)}</th>
+                          <td>{tech.assigned_total}</td>
+                          <td>{tech.resolved_total}</td>
+                          <td>{tech.closed_total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CollapsiblePanel>
             )}
           </section>
         )}

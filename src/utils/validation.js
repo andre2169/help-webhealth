@@ -59,13 +59,18 @@ export function parsePhoneValue(value) {
 
 export function validatePhone(value, required = false) {
   const raw = String(value || "").trim();
-  const phone = onlyDigits(raw, 13);
-  if (!phone) {
+  if (!raw) {
     if (required) throw new Error("Informe telefone com DDD.");
     return "";
   }
 
-  if (raw.startsWith("+") || (phone.startsWith("55") && [12, 13].includes(phone.length))) {
+  if (!/^[0-9]+$/.test(raw)) {
+    throw new Error("Informe somente números do telefone brasileiro, sem DDI ou símbolos.");
+  }
+
+  const phone = raw;
+
+  if (phone.startsWith("55") && [12, 13].includes(phone.length)) {
     throw new Error("Use somente DDD + número, sem DDI ou +55.");
   }
 
@@ -105,6 +110,9 @@ export function validatePassword(value) {
   const password = String(value || "");
   if (password.length < 10) {
     throw new Error("A senha deve ter pelo menos 10 caracteres.");
+  }
+  if (new TextEncoder().encode(password).length > 72) {
+    throw new Error("A senha ficou muito longa. Tente uma senha menor.");
   }
   if (!/[A-Za-zÀ-ÖØ-öø-ÿ]/.test(password) || !/\d/.test(password)) {
     throw new Error("A senha deve ter letras e números.");

@@ -1,0 +1,6 @@
+# HelpWeb Health is an authenticated support system.
+# This file asks crawlers not to index or reuse application pages.
+
+User-agent: *
+Content-Signal: search=no,ai-input=no,ai-train=no,use=none
+Disallow: /

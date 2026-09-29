@@ -1,4 +1,12 @@
 const ICONS = {
+  appMark: (
+    <>
+      <rect x="4.5" y="4.5" width="5.5" height="5.5" rx="1.5" transform="rotate(45 7.25 7.25)" fill="currentColor" stroke="none" />
+      <rect x="14" y="4.5" width="5.5" height="5.5" rx="1.5" transform="rotate(45 16.75 7.25)" fill="currentColor" stroke="none" />
+      <rect x="4.5" y="14" width="5.5" height="5.5" rx="1.5" transform="rotate(45 7.25 16.75)" fill="currentColor" stroke="none" />
+      <rect x="14" y="14" width="5.5" height="5.5" rx="1.5" transform="rotate(45 16.75 16.75)" fill="currentColor" stroke="none" />
+    </>
+  ),
   activity: (
     <>
       <path d="M4 12h4l2-6 4 12 2-6h4" />
@@ -75,9 +83,10 @@ const ICONS = {
   ),
   dashboard: (
     <>
-      <path d="M4 13h6V5H4v8Z" />
-      <path d="M14 19h6V5h-6v14Z" />
-      <path d="M4 19h6v-3H4v3Z" />
+      <rect x="4" y="4" width="6" height="6" rx="1.5" fill="currentColor" stroke="none" />
+      <rect x="14" y="4" width="6" height="6" rx="1.5" fill="currentColor" stroke="none" />
+      <rect x="4" y="14" width="6" height="6" rx="1.5" fill="currentColor" stroke="none" />
+      <rect x="14" y="14" width="6" height="6" rx="1.5" fill="currentColor" stroke="none" />
     </>
   ),
   filter: (
@@ -102,9 +111,7 @@ const ICONS = {
   ),
   home: (
     <>
-      <path d="m4 11 8-7 8 7" />
-      <path d="M6 10v10h12V10" />
-      <path d="M10 20v-6h4v6" />
+      <path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1Z" fill="currentColor" stroke="none" />
     </>
   ),
   key: (
@@ -177,12 +184,20 @@ const ICONS = {
   ),
   reports: (
     <>
-      <path d="M5 19V5" />
-      <path d="M5 19h14" />
-      <path d="M9 16V9" />
-      <path d="M13 16V7" />
-      <path d="M17 16v-4" />
+      <path d="M4 19h16" />
+      <rect x="7" y="10" width="2.8" height="7" rx="1" fill="currentColor" stroke="none" />
+      <rect x="11" y="6" width="2.8" height="11" rx="1" fill="currentColor" stroke="none" />
+      <rect x="15" y="12" width="2.8" height="5" rx="1" fill="currentColor" stroke="none" />
     </>
+  ),
+  search: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m16 16 5 5" />
+    </>
+  ),
+  moon: (
+    <path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z" fill="currentColor" stroke="none" />
   ),
   save: (
     <>
@@ -200,6 +215,12 @@ const ICONS = {
   shield: (
     <>
       <path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6l-8-3Z" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
     </>
   ),
   tag: (

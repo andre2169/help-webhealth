@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   confirmEmailChange,
@@ -41,7 +41,7 @@ const ROLE_LABELS = {
 const PROFILE_LIMITS = {
   name: 100,
   email: 254,
-  password: 128,
+  password: 72,
   jobTitle: 40,
   department: 30,
   unitName: 80,
@@ -108,6 +108,8 @@ export default function Profile() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const profileSaveLock = useRef(false);
   const [avatarMessage, setAvatarMessage] = useState("");
   const [avatarError, setAvatarError] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
@@ -165,6 +167,9 @@ export default function Profile() {
 
   async function saveProfile(event) {
     event.preventDefault();
+    if (profileSaveLock.current) return;
+    profileSaveLock.current = true;
+    setProfileSaving(true);
     setError("");
     setMessage("");
     try {
@@ -180,6 +185,9 @@ export default function Profile() {
       setMessage("Perfil atualizado.");
     } catch (err) {
       setError(err.message);
+    } finally {
+      profileSaveLock.current = false;
+      setProfileSaving(false);
     }
   }
 
@@ -528,12 +536,15 @@ export default function Profile() {
               onChange={(e) => setNotificationPreference(e.target.value)}
             >
               <option value="email">Email</option>
-              <option value="whatsapp">WhatsApp futuramente</option>
-              <option value="both">Email e WhatsApp futuramente</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="both">Email e WhatsApp</option>
             </select>
-            <button type="submit">
+            <p className="field-hint">
+              Técnicos com WhatsApp selecionado podem receber avisos de chamados conforme seu perfil e número cadastrado.
+            </p>
+            <button type="submit" disabled={profileSaving}>
               <Icon name="save" />
-              Salvar perfil
+              {profileSaving ? "Salvando…" : "Salvar perfil"}
             </button>
           </form>
 
@@ -650,7 +661,7 @@ export default function Profile() {
             <PasswordField
               minLength={10}
               value={newPassword}
-              placeholder="Mínimo 10 caracteres, com letras e números"
+              placeholder="Mínimo 10 caracteres"
               onChange={(e) => {
                 setNewPassword(e.target.value);
                 setPasswordAwaitingCode(false);

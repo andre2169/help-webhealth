@@ -20,7 +20,18 @@ export default function NotificationToast() {
   return (
     <div className="notification-toast" role="status" aria-live="polite">
       <div className="notification-toast-icon">
-        <Icon name={toastNotification.type === "ticket.reopened" ? "refresh" : "bell"} />
+        <Icon
+          name={
+            toastNotification.type === "ticket.reopened"
+              ? "refresh"
+              : toastNotification.type === "ticket.commented"
+                ? "message"
+                : toastNotification.type === "ticket.resolved" ||
+                    toastNotification.type === "ticket.closed"
+                  ? "check"
+                  : "bell"
+          }
+        />
       </div>
       <div className="notification-toast-content">
         <strong>{toastNotification.title}</strong>

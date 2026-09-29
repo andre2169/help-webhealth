@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../context/NotificationsContext";
+import { useAuth } from "../context/AuthContext";
 import Icon from "./Icon";
 
 function formatNotificationTime(value) {
@@ -15,6 +16,7 @@ function formatNotificationTime(value) {
 
 export default function NotificationCenter() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     enabled,
     items,
@@ -97,7 +99,11 @@ export default function NotificationCenter() {
           <div className="notification-menu-header">
             <div>
               <strong>Notificações</strong>
-              <span>Chamados novos e reabertos</span>
+               <span>
+                 {user?.role === "technician"
+                   ? "Chamados novos e atualizações vinculadas"
+                   : "Atualizações dos seus chamados"}
+               </span>
             </div>
             <button
               type="button"
@@ -131,7 +137,16 @@ export default function NotificationCenter() {
                 <span className="notification-item-icon">
                   <Icon
                     name={
-                      notification.type === "ticket.reopened" ? "refresh" : "ticket"
+                     notification.type === "ticket.reopened"
+                       ? "refresh"
+                       : notification.type === "ticket.commented"
+                         ? "message"
+                         : notification.type === "ticket.assigned"
+                           ? "user"
+                           : notification.type === "ticket.resolved" ||
+                               notification.type === "ticket.closed"
+                             ? "check"
+                             : "ticket"
                     }
                     size={16}
                   />

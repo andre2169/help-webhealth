@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import Icon from "./Icon";
 import NotificationCenter from "./NotificationCenter";
 import UserAvatar from "./UserAvatar";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Topbar({ title, subtitle }) {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function Topbar({ title, subtitle }) {
         {subtitle && <span>{subtitle}</span>}
       </div>
       <div className="topbar-actions">
+        <ThemeToggle compact />
         <Link to="/" className="topbar-home-link" title="Voltar ao início">
           <Icon name="home" />
           <span>Início</span>

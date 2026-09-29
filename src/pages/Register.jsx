@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../api/api";
 import Icon from "../components/Icon";
 import PasswordField from "../components/PasswordField";
+import ThemeToggle from "../components/ThemeToggle";
 import {
   BRAZIL_PHONE_HINT,
   BRAZIL_PHONE_MAX_LENGTH,
@@ -17,7 +18,7 @@ import {
 const PROFILE_LIMITS = {
   name: 100,
   email: 254,
-  password: 128,
+  password: 72,
   jobTitle: 40,
   department: 30,
   unitName: 80,
@@ -32,6 +33,7 @@ export default function Register() {
   const [department, setDepartment] = useState("");
   const [unitName, setUnitName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -43,10 +45,15 @@ export default function Register() {
     setSubmitting(true);
 
     try {
+      const validatedPassword = validatePassword(password);
+      if (validatedPassword !== confirmPassword) {
+        throw new Error("As senhas não conferem.");
+      }
+
       await registerUser({
         name: validateName(name),
         email: validateEmail(email),
-        password: validatePassword(password),
+        password: validatedPassword,
         phone: validatePhone(phone),
         jobTitle: validateShortText(jobTitle, "Cargo", { maxLength: PROFILE_LIMITS.jobTitle }),
         department: validateShortText(department, "Setor", { maxLength: PROFILE_LIMITS.department }),
@@ -62,86 +69,130 @@ export default function Register() {
   }
 
   return (
-    <div className="auth-shell">
-      <div className="card">
+    <div className="auth-shell auth-shell-modern">
+      <div className="auth-theme-control"><ThemeToggle compact /></div>
+      <div className="card auth-card auth-register-card">
         <div className="card-brand">
-          <div className="card-brand-mark">HD</div>
+          <div className="card-brand-mark"><Icon name="shield" size={20} /></div>
           <div>
             <strong style={{ display: "block", fontFamily: "var(--font-display)" }}>
-              HELPE DESK
+              HelpWeb Health
             </strong>
           </div>
         </div>
 
-        <h1>CRIAR CONTA</h1>
+        <h1>Criar sua conta</h1>
         <p>Cadastre-se para abrir seus chamados de suporte.</p>
 
-        <form onSubmit={handleSubmit}>
-          <label>Nome</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Seu nome completo"
-            maxLength={PROFILE_LIMITS.name}
-            required
-          />
+        <form className="register-form" onSubmit={handleSubmit}>
+          <div className="register-field register-field-wide">
+            <label htmlFor="register-name">Nome completo</label>
+            <input
+              id="register-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Seu nome completo"
+              maxLength={PROFILE_LIMITS.name}
+              autoComplete="name"
+              required
+            />
+          </div>
 
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="voce@empresa.com"
-            maxLength={PROFILE_LIMITS.email}
-            required
-          />
+          <div className="register-form-grid register-form-grid-two">
+            <div className="register-field">
+              <label htmlFor="register-email">Email</label>
+              <input
+                id="register-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="voce@empresa.com"
+                maxLength={PROFILE_LIMITS.email}
+                autoComplete="email"
+                required
+              />
+            </div>
 
-          <label>Telefone</label>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(onlyDigits(e.target.value, BRAZIL_PHONE_MAX_LENGTH))}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={BRAZIL_PHONE_MAX_LENGTH}
-            placeholder={BRAZIL_PHONE_HINT}
-            autoComplete="tel-national"
-          />
-          <p className="field-hint">Use apenas números do Brasil: DDD + número, sem +55.</p>
+            <div className="register-field">
+              <label htmlFor="register-phone">Telefone</label>
+              <input
+                id="register-phone"
+                value={phone}
+                onChange={(e) => setPhone(onlyDigits(e.target.value, BRAZIL_PHONE_MAX_LENGTH))}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={BRAZIL_PHONE_MAX_LENGTH}
+                placeholder={BRAZIL_PHONE_HINT}
+                autoComplete="tel-national"
+              />
+              <p className="field-hint">DDD + número, sem +55.</p>
+            </div>
+          </div>
 
-          <label>Cargo ou função</label>
-          <input
-            value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
-            placeholder="Ex.: recepção, enfermagem"
-            maxLength={PROFILE_LIMITS.jobTitle}
-          />
+          <div className="register-form-grid register-form-grid-three">
+            <div className="register-field">
+              <label htmlFor="register-job-title">Cargo ou função</label>
+              <input
+                id="register-job-title"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="Ex.: recepção"
+                maxLength={PROFILE_LIMITS.jobTitle}
+              />
+            </div>
 
-          <label>Setor</label>
-          <input
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            placeholder="Ex.: UTI, laboratório, farmácia"
-            maxLength={PROFILE_LIMITS.department}
-          />
+            <div className="register-field">
+              <label htmlFor="register-department">Setor</label>
+              <input
+                id="register-department"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="Ex.: UTI"
+                maxLength={PROFILE_LIMITS.department}
+              />
+            </div>
 
-          <label>Unidade</label>
-          <input
-            value={unitName}
-            onChange={(e) => setUnitName(e.target.value)}
-            placeholder="Ex.: UPA Centro, UBS Bairro"
-            maxLength={PROFILE_LIMITS.unitName}
-          />
+            <div className="register-field">
+              <label htmlFor="register-unit">Unidade</label>
+              <input
+                id="register-unit"
+                value={unitName}
+                onChange={(e) => setUnitName(e.target.value)}
+                placeholder="Ex.: UPA Centro"
+                maxLength={PROFILE_LIMITS.unitName}
+              />
+            </div>
+          </div>
 
-          <label>Senha</label>
-          <PasswordField
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Mínimo 10 caracteres, com letras e números"
-            required
-            minLength={10}
-            maxLength={PROFILE_LIMITS.password}
-            autoComplete="new-password"
-          />
+          <div className="register-form-grid register-form-grid-two">
+            <div className="register-field">
+              <label htmlFor="register-password">Senha</label>
+              <PasswordField
+                id="register-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mínimo 10 caracteres"
+                required
+                minLength={10}
+                maxLength={PROFILE_LIMITS.password}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="register-field">
+              <label htmlFor="register-confirm-password">Confirmar senha</label>
+              <PasswordField
+                id="register-confirm-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Digite a senha novamente"
+                required
+                minLength={10}
+                maxLength={PROFILE_LIMITS.password}
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
 
           {error && <p className="error">{error}</p>}
           {success && <p className="success">{success}</p>}

@@ -5,6 +5,7 @@ import PasswordField from "../components/PasswordField";
 import { confirmAccountRecovery, requestAccountRecovery } from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { validateEmail, validatePassword } from "../utils/validation";
+import ThemeToggle from "../components/ThemeToggle";
 
 function secondsFromVerification(result) {
   return Math.max(0, Number(result?.expires_in_minutes || 0) * 60);
@@ -28,7 +29,7 @@ function verificationMessage(result, fallback) {
 }
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, verifyLoginMfa } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState("login");
@@ -37,6 +38,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loginNotice, setLoginNotice] = useState(location.state?.notice || "");
   const [submitting, setSubmitting] = useState(false);
+  const [loginChallenge, setLoginChallenge] = useState("");
+  const [loginMfaCode, setLoginMfaCode] = useState("");
 
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [recoveryPassword, setRecoveryPassword] = useState("");
@@ -69,6 +72,36 @@ export default function Login() {
 
     try {
       const loggedUser = await login(email, password);
+      if (loggedUser?.status === "verification_required") {
+        setLoginChallenge(loggedUser.challenge_id);
+        setLoginMfaCode("");
+        setPassword("");
+        setLoginNotice(loggedUser.message);
+        return;
+      }
+
+      if (loggedUser && !loggedUser.email_verified) {
+        navigate("/perfil", {
+          state: {
+            notice: "Confirme seu email para liberar a abertura de chamados. Digite o código recebido ou solicite um novo.",
+          },
+        });
+      } else {
+        navigate("/");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleVerifyLoginMfa(event) {
+    event.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      const loggedUser = await verifyLoginMfa(loginChallenge, loginMfaCode);
       if (loggedUser && !loggedUser.email_verified) {
         navigate("/perfil", {
           state: {
@@ -154,6 +187,8 @@ export default function Login() {
 
   function showRecovery() {
     setMode("recovery");
+    setLoginChallenge("");
+    setLoginMfaCode("");
     setRecoveryEmail(email);
     setError("");
     setLoginNotice("");
@@ -162,16 +197,19 @@ export default function Login() {
 
   function showLogin() {
     setMode("login");
+    setLoginChallenge("");
+    setLoginMfaCode("");
     resetRecovery();
   }
 
   const isRecovery = mode === "recovery";
 
   return (
-    <div className="auth-shell">
-      <div className="card">
+    <div className="auth-shell auth-shell-modern">
+      <div className="auth-theme-control"><ThemeToggle compact /></div>
+      <div className="card auth-card">
         <div className="card-brand">
-          <div className="card-brand-mark">HD</div>
+          <div className="card-brand-mark"><Icon name="shield" size={20} /></div>
           <div>
             <strong style={{ display: "block", fontFamily: "var(--font-display)" }}>
               HelpWeb Health
@@ -179,15 +217,17 @@ export default function Login() {
           </div>
         </div>
 
-        <h1>{isRecovery ? "RECUPERAR CONTA" : "ENTRAR"}</h1>
+        <h1>{isRecovery ? "Recuperar conta" : loginChallenge ? "Confirmar acesso" : "Entrar na conta"}</h1>
         <p>
           {isRecovery
             ? "Receba um código no email cadastrado para redefinir sua senha."
-            : "Acesse o sistema de chamados de TI."}
+            : loginChallenge
+              ? "Informe o código enviado ao email da sua conta para concluir o acesso."
+              : "Acesse o sistema de chamados de TI."}
         </p>
 
         {!isRecovery ? (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={loginChallenge ? handleVerifyLoginMfa : handleSubmit}>
             <label>Email</label>
             <input
               type="email"
@@ -195,25 +235,63 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="voce@empresa.com"
               autoComplete="email"
+              disabled={Boolean(loginChallenge)}
               required
             />
 
-            <label>Senha</label>
-            <PasswordField
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-            />
+            {!loginChallenge ? (
+              <>
+                <label>Senha</label>
+                <PasswordField
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                />
+              </>
+            ) : (
+              <>
+                <label htmlFor="login-mfa-code">Código de acesso</label>
+                <input
+                  id="login-mfa-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  value={loginMfaCode}
+                  onChange={(event) =>
+                    setLoginMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  placeholder="000000"
+                  required
+                />
+              </>
+            )}
 
             {error && <p className="error">{error}</p>}
             {loginNotice && <p className="success compact-feedback">{loginNotice}</p>}
 
             <button type="submit" className="full" disabled={submitting}>
-              <Icon name="logIn" />
-              {submitting ? "Entrando…" : "Entrar"}
+              <Icon name={loginChallenge ? "shield" : "logIn"} />
+              {submitting
+                ? loginChallenge ? "Confirmando…" : "Entrando…"
+                : loginChallenge ? "Confirmar código" : "Entrar"}
             </button>
+            {loginChallenge && (
+              <button
+                type="button"
+                className="secondary full"
+                onClick={() => {
+                  setLoginChallenge("");
+                  setLoginMfaCode("");
+                  setLoginNotice("");
+                }}
+              >
+                Voltar ao login
+              </button>
+            )}
           </form>
         ) : (
           <form onSubmit={recoveryAwaitingCode ? confirmRecoveryCode : requestRecoveryCode}>
@@ -240,6 +318,7 @@ export default function Login() {
               }}
               placeholder="Mínimo 10 caracteres"
               minLength={10}
+              maxLength={72}
               autoComplete="new-password"
               disabled={recoveryAwaitingCode}
               required

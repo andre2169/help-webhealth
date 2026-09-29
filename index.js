@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = normalize(join(fileURLToPath(new URL(".", import.meta.url)), "dist"));
 const port = Number(process.env.PORT || 4173);
-const fallbackApiOrigin = "https://beckendhelpapihealth.shardweb.app";
+const fallbackApiOrigin = "https://backendhelpapihealth.shardweb.app";
 const MAX_URL_LENGTH = 2048;
 const MAX_HEADER_BYTES = 32_000;
 const STATIC_CACHE_SECONDS = 31_536_000;

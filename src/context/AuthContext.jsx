@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   clearAuthToken,
+  ensureCsrfToken,
   getMe,
   login as loginRequest,
   logout as logoutRequest,
+  verifyLoginMfa as verifyLoginMfaRequest,
 } from "../api/api";
 
 const AuthContext = createContext(null);
@@ -15,6 +17,7 @@ export function AuthProvider({ children }) {
   const loadUser = useCallback(async () => {
     try {
       const me = await getMe();
+      await ensureCsrfToken();
       setUser(me);
       return me;
     } catch {
@@ -32,8 +35,29 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function handleLogin(email, password) {
-    await loginRequest(email, password);
-    return loadUser();
+    const result = await loginRequest(email, password);
+    if (result?.status === "verification_required") {
+      return result;
+    }
+
+    const loggedUser = await loadUser();
+
+    if (!loggedUser) {
+      throw new Error(
+        "O login foi aceito, mas a sessão não pôde ser iniciada. Verifique a configuração do cookie da API local."
+      );
+    }
+
+    return loggedUser;
+  }
+
+  async function handleVerifyLoginMfa(challengeId, code) {
+    await verifyLoginMfaRequest(challengeId, code);
+    const loggedUser = await loadUser();
+    if (!loggedUser) {
+      throw new Error("Não foi possível iniciar a sessão. Tente entrar novamente.");
+    }
+    return loggedUser;
   }
 
   async function handleLogout() {
@@ -46,6 +70,7 @@ export function AuthProvider({ children }) {
     loading,
     isAuthenticated: Boolean(user),
     login: handleLogin,
+    verifyLoginMfa: handleVerifyLoginMfa,
     logout: handleLogout,
     refreshUser: loadUser,
   };

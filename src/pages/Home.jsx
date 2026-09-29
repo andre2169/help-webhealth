@@ -27,6 +27,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   const isSupportRole = user?.role === "technician" || user?.role === "admin";
+  const isAdmin = user?.role === "admin";
   const needsEmailVerification = user && !user.email_verified;
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export default function Home() {
       setError("");
 
       try {
-        const ticketsResult = await getTickets({ limit: 5 });
+        const ticketsResult = await getTickets({ limit: 5, includeTotal: true });
         let summaryResult = null;
 
         if (isSupportRole) {
@@ -74,7 +75,7 @@ export default function Home() {
         {
           icon: "dashboard",
           title: "Dashboard",
-          text: "Indicadores operacionais do suporte.",
+          text: isAdmin ? "Indicadores gerais da operação." : "Seus indicadores de atendimento.",
           to: "/dashboard",
         },
         {
@@ -114,7 +115,7 @@ export default function Home() {
         to: "/perfil",
       },
     ];
-  }, [isSupportRole, needsEmailVerification]);
+  }, [isAdmin, isSupportRole, needsEmailVerification]);
 
   return (
     <>

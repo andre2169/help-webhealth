@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Icon from "./Icon";
 import UserAvatar from "./UserAvatar";
+import ThemeToggle from "./ThemeToggle";
 
 const ROLE_LABELS = {
   user: "Usuário",
@@ -18,7 +19,7 @@ export default function Sidebar({ onLogout }) {
     <aside className="sidebar">
       <NavLink to="/" className="sidebar-brand">
         <div className="sidebar-brand-mark">
-          <Icon name="shield" size={20} />
+          <Icon name="appMark" size={20} />
         </div>
         <div>
           <strong>HelpWeb Health</strong>
@@ -103,6 +104,13 @@ export default function Sidebar({ onLogout }) {
               <Icon name="users" />
               <span>Usuários</span>
             </NavLink>
+            <NavLink
+              to="/admin/eventos"
+              className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}
+            >
+              <Icon name="activity" />
+              <span>Eventos</span>
+            </NavLink>
           </nav>
         </>
       )}
@@ -115,6 +123,7 @@ export default function Sidebar({ onLogout }) {
             <span>{ROLE_LABELS[role] || role}</span>
           </div>
         </NavLink>
+        <ThemeToggle />
         <button className="ghost full sidebar-logout" onClick={onLogout}>
           <Icon name="logOut" />
           Sair

@@ -3,8 +3,11 @@ const API_URL = (
 ).replace(/\/$/, "");
 const API_BASE_URL = API_URL.replace(/\/api\/v1$/, "");
 const LEGACY_AUTH_TOKEN_KEYS = ["helpwebhealth_token", "token"];
+const CSRF_COOKIE_NAME = import.meta.env.VITE_CSRF_COOKIE_NAME || "helpwebhealth_csrf";
+const CSRF_HEADER_NAME = import.meta.env.VITE_CSRF_HEADER_NAME || "X-CSRF-Token";
 const GET_CACHE_TTL_MS = 3000;
 const getRequestCache = new Map();
+let csrfToken = "";
 
 function pruneGetCache(now) {
   for (const [key, item] of getRequestCache.entries()) {
@@ -49,6 +52,7 @@ export function storeAuthToken() {
 
 export function clearAuthToken() {
   removeLegacyAuthToken();
+  csrfToken = "";
 }
 
 export async function checkApiHealth() {
@@ -64,9 +68,54 @@ export async function checkApiHealth() {
 }
 
 function getAuthHeaders() {
-  return {
+  const headers = {
     "Content-Type": "application/json",
   };
+
+  try {
+    const cookie = document.cookie
+      .split(";")
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(`${CSRF_COOKIE_NAME}=`));
+    const cookieToken = cookie
+      ? decodeURIComponent(cookie.slice(CSRF_COOKIE_NAME.length + 1))
+      : "";
+    if (!csrfToken && cookieToken) {
+      csrfToken = cookieToken;
+    }
+  } catch {
+    // O navegador pode bloquear document.cookie em contextos restritos.
+  }
+
+  if (csrfToken) {
+    headers[CSRF_HEADER_NAME] = csrfToken;
+  }
+
+  return headers;
+}
+
+function rememberCsrfToken(response) {
+  const responseToken = response.headers.get(CSRF_HEADER_NAME);
+  if (responseToken) {
+    csrfToken = responseToken;
+  }
+}
+
+export async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken;
+
+  const response = await fetch(`${API_URL}/auth/csrf`, {
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || typeof data?.csrf_token !== "string" || !data.csrf_token) {
+    throw new Error("Não foi possível preparar a proteção da sessão.");
+  }
+
+  csrfToken = data.csrf_token;
+  return csrfToken;
 }
 
 function buildReportsQuery({
@@ -90,6 +139,7 @@ function buildReportsQuery({
 }
 
 async function handle(response) {
+  rememberCsrfToken(response);
   const isNoContent = response.status === 204;
   const data = isNoContent ? null : await response.json().catch(() => null);
 
@@ -139,13 +189,33 @@ async function cachedGetJson(url, { ttl = GET_CACHE_TTL_MS } = {}) {
   return promise;
 }
 
+async function getJson(url, { signal } = {}) {
+  const response = await fetch(url, {
+    signal,
+    credentials: "include",
+    headers: getAuthHeaders(),
+  });
+  return handle(response);
+}
+
 /* ---------- Auth ---------- */
 export async function login(email, password) {
+  csrfToken = "";
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
+  });
+  return handle(response);
+}
+
+export async function verifyLoginMfa(challengeId, code) {
+  const response = await fetch(`${API_URL}/auth/login/verify`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challenge_id: challengeId, code }),
   });
   return handle(response);
 }
@@ -326,6 +396,7 @@ export async function registerUser({
 
 /* ---------- Tickets ---------- */
 export async function getTickets({
+  search = "",
   status = "",
   technicianId = "",
   userId = "",
@@ -337,12 +408,16 @@ export async function getTickets({
   direction = "desc",
   skip = 0,
   limit = 10,
+  includeTotal = false,
+  signal,
 } = {}) {
   const params = new URLSearchParams();
   params.append("skip", skip);
   params.append("limit", limit);
+  if (includeTotal) params.append("include_total", "true");
   params.append("order_by", orderBy);
   params.append("direction", direction);
+  if (search) params.append("search", search);
   if (status) params.append("status", status);
   if (technicianId) params.append("technician_id", technicianId);
   if (userId) params.append("user_id", userId);
@@ -351,7 +426,53 @@ export async function getTickets({
   if (sector) params.append("sector", sector);
   if (operationalImpact) params.append("operational_impact", operationalImpact);
 
-  return cachedGetJson(`${API_URL}/tickets/?${params.toString()}`);
+  const url = `${API_URL}/tickets/?${params.toString()}`;
+  return signal ? getJson(url, { signal }) : cachedGetJson(url);
+}
+
+export async function getDeletedTickets({
+  search = "",
+  status = "",
+  priority = "",
+  category = "",
+  sector = "",
+  operationalImpact = "",
+  direction = "desc",
+  skip = 0,
+  limit = 10,
+  signal,
+} = {}) {
+  const params = new URLSearchParams({
+    skip: String(skip),
+    limit: String(limit),
+    direction,
+  });
+  if (search) params.append("search", search);
+  if (status) params.append("status", status);
+  if (priority) params.append("priority", priority);
+  if (category) params.append("category", category);
+  if (sector) params.append("sector", sector);
+  if (operationalImpact) params.append("operational_impact", operationalImpact);
+
+  return getJson(`${API_URL}/tickets/deleted?${params.toString()}`, { signal });
+}
+
+export async function getDeletedTicketById(ticketId, { signal } = {}) {
+  const response = await fetch(`${API_URL}/tickets/${ticketId}/deleted`, {
+    credentials: "include",
+    headers: getAuthHeaders(),
+    signal,
+  });
+  return handle(response);
+}
+
+export async function getDeletedTicketTimeline(ticketId, { signal } = {}) {
+  const response = await fetch(`${API_URL}/tickets/${ticketId}/deleted/timeline`, {
+    credentials: "include",
+    headers: getAuthHeaders(),
+    signal,
+  });
+  return handle(response);
 }
 
 export async function createTicket({
@@ -389,10 +510,11 @@ export async function createTicket({
   return data;
 }
 
-export async function getTicketById(ticketId) {
+export async function getTicketById(ticketId, { signal } = {}) {
   const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
     credentials: "include",
     headers: getAuthHeaders(),
+    signal,
   });
   return handle(response);
 }
@@ -530,12 +652,57 @@ export async function downloadReportsPdf(filters = {}) {
 }
 
 /* ---------- Admin ---------- */
-export async function adminListUsers() {
-  const response = await fetch(`${API_URL}/admin/users`, {
+export async function adminListUsers({
+  search = "",
+  role = "",
+  isActive = "",
+  orderBy = "name",
+  direction = "asc",
+  skip = 0,
+  limit = 20,
+  signal,
+} = {}) {
+  const params = new URLSearchParams({
+    skip: String(skip),
+    limit: String(limit),
+    order_by: orderBy,
+    direction,
+  });
+  if (search) params.append("search", search);
+  if (role) params.append("role", role);
+  if (isActive !== "") params.append("is_active", String(isActive));
+
+  return getJson(`${API_URL}/admin/users?${params.toString()}`, { signal });
+}
+
+export async function adminListNotificationEvents({ skip = 0, limit = 50 } = {}) {
+  const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+  return cachedGetJson(`${API_URL}/admin/notification-events?${params.toString()}`, {
+    ttl: 5000,
+  });
+}
+
+export async function adminListTicketEventSummaries({
+  search = "",
+  skip = 0,
+  limit = 20,
+  signal,
+} = {}) {
+  const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+  if (search) params.append("search", search);
+
+  return getJson(`${API_URL}/admin/ticket-events?${params.toString()}`, { signal });
+}
+
+export async function adminRestoreDeletedTicket(ticketId) {
+  const response = await fetch(`${API_URL}/admin/deleted-tickets/${ticketId}/restore`, {
+    method: "POST",
     credentials: "include",
     headers: getAuthHeaders(),
   });
-  return handle(response);
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 export async function adminGetUser(userId) {

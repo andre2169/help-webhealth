@@ -14,6 +14,7 @@ import ServiceDesk from "./pages/ServiceDesk";
 import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminNotificationEvents from "./pages/admin/AdminNotificationEvents";
 import "./style.css";
 
 function PublicOnly({ children }) {
@@ -49,6 +50,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/tickets" element={<Tickets />} />
+              <Route path="/admin/excluidos" element={<Navigate to="/tickets?status=deleted" replace />} />
               <Route path="/tickets/novo" element={<CreateTicket />} />
               <Route path="/tickets/:id" element={<TicketDetail />} />
               <Route path="/perfil" element={<Profile />} />
@@ -61,6 +63,7 @@ export default function App() {
 
               <Route element={<RequireRole roles={["admin"]} />}>
                 <Route path="/admin/usuarios" element={<AdminUsers />} />
+                <Route path="/admin/eventos" element={<AdminNotificationEvents />} />
               </Route>
             </Route>
           </Route>

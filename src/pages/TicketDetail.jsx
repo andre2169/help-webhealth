@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   assignTicket,
+  adminRestoreDeletedTicket,
   closeTicket,
   createComment,
   deleteTicket,
   getTicketById,
+  getDeletedTicketById,
+  getDeletedTicketTimeline,
   getTicketTimeline,
   reopenTicket,
   resolveTicket,
@@ -42,6 +45,14 @@ const IMPACT_LABELS = {
   critical: "Crítico",
 };
 
+const STATUS_LABELS = {
+  open: "Aberto",
+  in_progress: "Em andamento",
+  resolved: "Resolvido",
+  closed: "Fechado",
+  reopened: "Reaberto",
+};
+
 const ROLE_LABELS = {
   user: "Usuário",
   technician: "Técnico",
@@ -54,7 +65,9 @@ export default function TicketDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isArchived = searchParams.get("deleted") === "1";
 
   const [ticket, setTicket] = useState(null);
   const [timeline, setTimeline] = useState([]);
@@ -72,14 +85,16 @@ export default function TicketDetail() {
   const loadTimeline = useCallback(async () => {
     setTimelineLoading(true);
     try {
-      const items = await getTicketTimeline(id);
+      const items = isArchived
+        ? await getDeletedTicketTimeline(id)
+        : await getTicketTimeline(id);
       setTimeline(items);
     } catch (err) {
       setError(err.message);
     } finally {
       setTimelineLoading(false);
     }
-  }, [id]);
+  }, [id, isArchived]);
 
   useEffect(() => {
     let active = true;
@@ -88,7 +103,8 @@ export default function TicketDetail() {
     setTicket(null);
     setTimeline([]);
 
-    getTicketById(id)
+    const getTicket = isArchived ? getDeletedTicketById : getTicketById;
+    getTicket(id)
       .then((found) => {
         if (!active) return;
         if (found) setTicket(found);
@@ -104,7 +120,7 @@ export default function TicketDetail() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, isArchived]);
 
   useEffect(() => {
     if (!ticket) return;
@@ -154,7 +170,7 @@ export default function TicketDetail() {
 
   async function handleDeleteTicket() {
     const confirmed = window.confirm(
-      "Excluir este chamado? Essa ação remove o histórico e comentários do ticket."
+      "Enviar este chamado para Excluídos? O histórico e os comentários serão preservados, e um administrador poderá recuperá-lo depois."
     );
     if (!confirmed) return;
 
@@ -162,7 +178,32 @@ export default function TicketDetail() {
     setActionLoading(true);
     try {
       await deleteTicket(ticket.id);
-      navigate("/tickets", { replace: true });
+      navigate(`/tickets?status=deleted&search=${encodeURIComponent(formatTicketCode(ticket.id))}`, {
+        replace: true,
+        state: { notice: `${formatTicketCode(ticket.id)} foi movido para Excluídos.` },
+      });
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleRestoreArchivedTicket() {
+    if (!ticket || actionLoading || user?.role !== "admin") return;
+    const confirmed = window.confirm(
+      `Recuperar ${formatTicketCode(ticket.id)}? O chamado voltará com o status ${STATUS_LABELS[ticket.status] || ticket.status}.`
+    );
+    if (!confirmed) return;
+
+    setActionError("");
+    setActionLoading(true);
+    try {
+      await adminRestoreDeletedTicket(ticket.id);
+      navigate(`/tickets?search=${encodeURIComponent(formatTicketCode(ticket.id))}`, {
+        replace: true,
+        state: { notice: `${formatTicketCode(ticket.id)} foi recuperado com o status original.` },
+      });
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -187,7 +228,7 @@ export default function TicketDetail() {
         <Topbar title="Chamado" />
         <main className="main">
           <p className="error">{error || "Chamado não encontrado."}</p>
-          <button className="secondary" onClick={() => navigate("/tickets")}>
+          <button className="secondary" onClick={() => navigate(location.state?.returnTo || (isArchived ? "/tickets?status=deleted" : "/tickets"))}>
             <Icon name="arrowLeft" />
             Voltar para chamados
           </button>
@@ -197,20 +238,21 @@ export default function TicketDetail() {
   }
 
   const role = user?.role;
+  const ticketsHref = location.state?.returnTo || (isArchived ? "/tickets?status=deleted" : "/tickets");
   const isOwner = ticket.user_id === user?.id;
   const isAssignedTechnician = ticket.technician_id === user?.id;
 
   const canAssign =
-    (role === "technician" || role === "admin") &&
+    !isArchived && (role === "technician" || role === "admin") &&
     ["open", "reopened"].includes(ticket.status);
   const canResolve =
-    (role === "technician" || role === "admin") &&
+    !isArchived && (role === "technician" || role === "admin") &&
     ticket.status === "in_progress" &&
     (role === "admin" || isAssignedTechnician);
-  const canClose = ticket.status === "resolved" && (isOwner || role === "admin");
+  const canClose = !isArchived && ticket.status === "resolved" && (isOwner || role === "admin");
   const canReopen =
-    ["resolved", "closed"].includes(ticket.status) && (isOwner || role === "admin");
-  const canDelete = role === "admin";
+    !isArchived && ["resolved", "closed"].includes(ticket.status) && (isOwner || role === "admin");
+  const canDelete = !isArchived && role === "admin";
   const issueImages =
     Array.isArray(ticket.issue_images) && ticket.issue_images.length > 0
       ? ticket.issue_images
@@ -220,9 +262,12 @@ export default function TicketDetail() {
 
   return (
     <>
-      <Topbar title={formatTicketCode(ticket.id)} subtitle={ticket.title} />
+      <Topbar
+        title={formatTicketCode(ticket.id)}
+        subtitle={isArchived ? `${ticket.title} · Chamado excluído` : ticket.title}
+      />
       <main className="main">
-        <button className="ghost" style={{ marginBottom: 12, padding: "4px 0" }} onClick={() => navigate("/tickets")}>
+        <button className="ghost" style={{ marginBottom: 12, padding: "4px 0" }} onClick={() => navigate(ticketsHref)}>
           <Icon name="arrowLeft" />
           Voltar para chamados
         </button>
@@ -241,6 +286,25 @@ export default function TicketDetail() {
           <h2 className="detail-title">{ticket.title}</h2>
           <StatusBadge status={ticket.status} />
         </div>
+
+        {isArchived && (
+          <section className="ticket-archived-detail-notice" role="status">
+            <div>
+              <strong><Icon name="trash" size={17} /> Chamado excluído</strong>
+              <span>
+                Excluído em {formatApiDateTime(ticket.deleted_at)}
+                {ticket.deleted_by_name ? ` por ${ticket.deleted_by_name}` : ""}. Esta ficha está em modo somente leitura.
+              </span>
+              {actionError && <p className="error">{actionError}</p>}
+            </div>
+            {user?.role === "admin" && (
+              <button type="button" className="primary small" onClick={handleRestoreArchivedTicket} disabled={actionLoading}>
+                <Icon name="refresh" size={16} />
+                {actionLoading ? "Recuperando..." : "Recuperar chamado"}
+              </button>
+            )}
+          </section>
+        )}
 
         <div className="health-context-strip">
           <div>
@@ -338,7 +402,7 @@ export default function TicketDetail() {
                 </div>
               )}
 
-              <form className="comment-form" onSubmit={handleComment}>
+              {!isArchived && <form className="comment-form" onSubmit={handleComment}>
                 <div className="comment-composer">
                   <UserAvatar user={user} size={38} className="comment-avatar" />
                   <div className="comment-composer-body">
@@ -366,7 +430,7 @@ export default function TicketDetail() {
                     </button>
                   </div>
                 </div>
-              </form>
+              </form>}
             </div>
           </div>
 
@@ -430,7 +494,7 @@ export default function TicketDetail() {
               )}
             </div>
 
-            {(canAssign || canResolve || canClose || canReopen || canDelete) && (
+            {!isArchived && (canAssign || canResolve || canClose || canReopen || canDelete) && (
               <div className="side-panel">
                 <h4>
                   <Icon name="activity" />

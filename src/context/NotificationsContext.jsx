@@ -7,12 +7,13 @@ import {
 import { useAuth } from "./AuthContext";
 
 const NotificationsContext = createContext(null);
-const SUPPORT_ROLES = ["technician", "admin"];
+const NOTIFICATION_ROLES = ["user", "technician"];
 const POLL_INTERVAL_MS = 60000;
 const MIN_REFRESH_INTERVAL_MS = 10000;
 
 function canReceiveNotifications(user) {
-  return SUPPORT_ROLES.includes(user?.role);
+  // Admins consultam o histórico administrativo; não entram na caixa comum.
+  return NOTIFICATION_ROLES.includes(user?.role) && user?.is_active !== false;
 }
 
 export function NotificationsProvider({ children }) {

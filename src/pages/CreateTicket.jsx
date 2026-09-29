@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTicket } from "../api/api";
 import Icon from "../components/Icon";
@@ -72,14 +72,45 @@ function counterClass(value, limit) {
   return value.length >= limit * 0.9 ? "field-counter is-warning" : "field-counter";
 }
 
+function SuggestionOptions({ field, options, value, onSelect, activeField, setActiveField }) {
+  if (activeField !== field) return null;
+
+  const normalizedValue = value.trim().toLocaleLowerCase();
+  const filteredOptions = options
+    .filter((option) => !normalizedValue || option.toLocaleLowerCase().includes(normalizedValue))
+    .slice(0, 8);
+
+  if (filteredOptions.length === 0) return null;
+
+  return (
+    <div className="field-suggestions" role="listbox" aria-label="Sugestões">
+      {filteredOptions.map((option) => (
+        <button
+          type="button"
+          className="field-suggestion"
+          key={option}
+          role="option"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            onSelect(option);
+            setActiveField(null);
+          }}
+        >
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function CreateTicket() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Infraestrutura");
+  const [category, setCategory] = useState("");
   const [priority, setPriority] = useState("medium");
-  const [sector, setSector] = useState("Recepção");
+  const [sector, setSector] = useState("");
   const [equipment, setEquipment] = useState("");
   const [assetTag, setAssetTag] = useState("");
   const [operationalImpact, setOperationalImpact] = useState("medium");
@@ -87,7 +118,9 @@ export default function CreateTicket() {
   const [imageError, setImageError] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [previewIndex, setPreviewIndex] = useState(null);
+  const [activeSuggestionField, setActiveSuggestionField] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -97,6 +130,9 @@ export default function CreateTicket() {
       setError("Confirme seu email no perfil antes de abrir chamados.");
       return;
     }
+
+    if (submitLock.current) return;
+    submitLock.current = true;
 
     setSubmitting(true);
     try {
@@ -137,6 +173,8 @@ export default function CreateTicket() {
       });
     } catch (err) {
       setError(err.message);
+    } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   }
@@ -227,54 +265,72 @@ export default function CreateTicket() {
           <div className="form-grid">
             <div>
               <label>Setor</label>
-              <input
-                list="sector-options"
-                value={sector}
-                onChange={(e) => setSector(e.target.value)}
-                placeholder="Ex: Recepção, UTI, Radiologia"
-                maxLength={TICKET_LIMITS.sector}
-                required
-              />
-              <datalist id="sector-options">
-                {SECTORS.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
+              <div className="field-control">
+                <input
+                  value={sector}
+                  onChange={(e) => setSector(e.target.value)}
+                  onFocus={() => setActiveSuggestionField("sector")}
+                  onBlur={() => window.setTimeout(() => setActiveSuggestionField(null), 120)}
+                  placeholder="Ex: Recepção, UTI, Radiologia"
+                  maxLength={TICKET_LIMITS.sector}
+                  required
+                />
+                <SuggestionOptions
+                  field="sector"
+                  options={SECTORS}
+                  value={sector}
+                  onSelect={setSector}
+                  activeField={activeSuggestionField}
+                  setActiveField={setActiveSuggestionField}
+                />
+              </div>
               <p className="field-hint">Escolha uma sugestão ou digite outro setor.</p>
             </div>
 
             <div>
               <label>Categoria</label>
-              <input
-                list="category-options"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ex: Rede, Hardware, Sistema hospitalar"
-                maxLength={TICKET_LIMITS.category}
-                required
-              />
-              <datalist id="category-options">
-                {CATEGORIES.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
+              <div className="field-control">
+                <input
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  onFocus={() => setActiveSuggestionField("category")}
+                  onBlur={() => window.setTimeout(() => setActiveSuggestionField(null), 120)}
+                  placeholder="Ex: Rede, Hardware, Sistema hospitalar"
+                  maxLength={TICKET_LIMITS.category}
+                  required
+                />
+                <SuggestionOptions
+                  field="category"
+                  options={CATEGORIES}
+                  value={category}
+                  onSelect={setCategory}
+                  activeField={activeSuggestionField}
+                  setActiveField={setActiveSuggestionField}
+                />
+              </div>
               <p className="field-hint">Use uma categoria pronta ou cadastre uma nova digitando.</p>
             </div>
 
             <div>
               <label>Equipamento ou sistema</label>
-              <input
-                list="equipment-options"
-                value={equipment}
-                onChange={(e) => setEquipment(e.target.value)}
-                placeholder="Ex: Impressora Zebra, Wi-Fi, ERP hospitalar"
-                maxLength={TICKET_LIMITS.equipment}
-              />
-              <datalist id="equipment-options">
-                {EQUIPMENTS.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
+              <div className="field-control">
+                <input
+                  value={equipment}
+                  onChange={(e) => setEquipment(e.target.value)}
+                  onFocus={() => setActiveSuggestionField("equipment")}
+                  onBlur={() => window.setTimeout(() => setActiveSuggestionField(null), 120)}
+                  placeholder="Ex: Impressora Zebra, Wi-Fi, ERP hospitalar"
+                  maxLength={TICKET_LIMITS.equipment}
+                />
+                <SuggestionOptions
+                  field="equipment"
+                  options={EQUIPMENTS}
+                  value={equipment}
+                  onSelect={setEquipment}
+                  activeField={activeSuggestionField}
+                  setActiveField={setActiveSuggestionField}
+                />
+              </div>
             </div>
 
             <div>
