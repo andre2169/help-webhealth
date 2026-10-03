@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { Activity, ChartColumn, Clock, Monitor } from "lucide-react";
 import { downloadReportsPdf, getReportsOverview } from "../api/api";
 import Icon from "../components/Icon";
 import CollapsiblePanel from "../components/CollapsiblePanel";
@@ -6,6 +7,9 @@ import Topbar from "../components/Topbar";
 import { useAuth } from "../context/AuthContext";
 import { formatApiDateTime } from "../utils/dateTime";
 import { validateShortText } from "../utils/validation";
+import { metricRows } from "../utils/reportMetrics";
+import useTicketCatalog from "../hooks/useTicketCatalog";
+import ListPagination from "../components/ListPagination";
 
 const LABELS = {
   open: "Aberto",
@@ -44,36 +48,7 @@ const IMPACT_OPTIONS = [
   { value: "critical", label: "Crítico" },
 ];
 
-const CATEGORY_OPTIONS = [
-  "Infraestrutura",
-  "Rede",
-  "Hardware",
-  "Software hospitalar",
-  "Impressão",
-  "Acesso",
-  "Telefonia",
-  "Internet",
-  "Segurança",
-  "Periféricos",
-  "Sistema de gestão hospitalar",
-  "Leitor ou coletor",
-];
-
-const SECTOR_OPTIONS = [
-  "Recepção",
-  "UTI",
-  "Enfermaria",
-  "Laboratório",
-  "Farmácia",
-  "Centro Cirúrgico",
-  "Pronto Atendimento",
-  "Radiologia",
-  "Ambulatório",
-  "Almoxarifado",
-  "Administrativo",
-  "TI",
-];
-
+const TECHNICIAN_PAGE_SIZE = 8;
 const EMPTY_FILTERS = {
   startDate: "",
   endDate: "",
@@ -137,21 +112,9 @@ function formatInputDate(value) {
   return `${day}/${month}/${year}`;
 }
 
-function MetricRows({ data, preserveOrder = false, initialLimit = 6, maxItems = 50, latest = false }) {
-  const [expanded, setExpanded] = useState(false);
-  const allEntries = Object.entries(data || {})
-    .map(([key, value]) => [key, Number(value) || 0])
-    .filter(([, value]) => value > 0);
-
-  if (!preserveOrder) {
-    allEntries.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
-  }
-
-  const entries = allEntries.length > maxItems
-    ? (latest ? allEntries.slice(-maxItems) : allEntries.slice(0, maxItems))
-    : allEntries;
-  const visibleEntries = expanded ? entries : entries.slice(0, initialLimit);
-  const maxValue = entries.reduce((max, [, value]) => Math.max(max, value), 1);
+function MetricRows({ data, preserveOrder = false }) {
+  const entries = metricRows(data, { preserveOrder });
+  const maxValue = entries.reduce((max, row) => Math.max(max, row.total), 1);
 
   if (!entries.length) {
     return <p className="report-empty">Sem dados para este recorte.</p>;
@@ -159,34 +122,17 @@ function MetricRows({ data, preserveOrder = false, initialLimit = 6, maxItems = 
 
   return (
     <div className="report-metric-list">
-      {visibleEntries.map(([key, value]) => (
-        <div className="report-metric-row" key={key}>
+      {entries.map(({ key, label, total, remainder }) => (
+        <div className={`report-metric-row${remainder ? " is-remainder" : ""}`} key={remainder ? "summary:remainder" : `metric:${key}`}>
           <div className="report-metric-copy">
-            <span>{safeReportLabel(LABELS[key] || key)}</span>
-            <strong>{value}</strong>
+            <span>{safeReportLabel(LABELS[label] || label)}</span>
+            <strong>{total}</strong>
           </div>
           <div className="report-metric-track" aria-hidden="true">
-            <span style={{ width: `${Math.max(3, (value / maxValue) * 100)}%` }} />
+            <span style={{ width: `${total ? Math.max(3, (total / maxValue) * 100) : 0}%` }} />
           </div>
         </div>
       ))}
-      {entries.length > initialLimit && (
-        <button
-          type="button"
-          className="report-show-more"
-          onClick={() => setExpanded((current) => !current)}
-          aria-expanded={expanded}
-        >
-          {expanded ? "Mostrar menos" : `Ver mais (${entries.length})`}
-        </button>
-      )}
-      {allEntries.length > entries.length && (
-        <p className="report-metric-note">
-          {latest
-            ? `Exibindo os ${entries.length} dias mais recentes.`
-            : `Exibindo os ${entries.length} itens de maior volume entre ${allEntries.length}.`}
-        </p>
-      )}
     </div>
   );
 }
@@ -195,6 +141,19 @@ function safeReportLabel(value, maxLength = 90) {
   const text = String(value ?? "").trim();
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1)}…`;
+}
+
+function SupportingIndicator({ title, icon: HeadingIcon, data, preserveOrder = false }) {
+  const id = useId();
+  return (
+    <section className="report-support-section" aria-labelledby={id}>
+      <header><h4 id={id}><HeadingIcon size={18} aria-hidden="true" />{title}</h4></header>
+      <div className="report-support-scroll" role="region" aria-labelledby={id} tabIndex={0}
+        onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>
+        <MetricRows data={data} preserveOrder={preserveOrder} />
+      </div>
+    </section>
+  );
 }
 
 function validateReportDates(filters) {
@@ -263,6 +222,10 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [activeBreakdown, setActiveBreakdown] = useState("status_counts");
+  const catalog = useTicketCatalog({ includeInactive: true });
+  const [technicianPage, setTechnicianPage] = useState(0);
+  const [technicianSearch, setTechnicianSearch] = useState("");
+  const [showIdleTechnicians, setShowIdleTechnicians] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -292,6 +255,11 @@ export default function Reports() {
   const slaWithinPercent = summaryMetrics.sla_within_percent || 0;
   const avgResolutionHours = summaryMetrics.avg_resolution_hours || 0;
   const reopenEvents = summaryMetrics.reopen_events_count || 0;
+  const technicians = (data?.technicians || []).filter(tech =>
+    (showIdleTechnicians || tech.assigned_total > 0)
+    && tech.name.toLocaleLowerCase("pt-BR").includes(technicianSearch.trim().toLocaleLowerCase("pt-BR")));
+  const currentTechnicianPage = Math.min(technicianPage, Math.max(0, Math.ceil(technicians.length / TECHNICIAN_PAGE_SIZE) - 1));
+  const visibleTechnicians = technicians.slice(currentTechnicianPage * TECHNICIAN_PAGE_SIZE, (currentTechnicianPage + 1) * TECHNICIAN_PAGE_SIZE);
 
   const appliedSummary = useMemo(
     () => [
@@ -335,6 +303,7 @@ export default function Reports() {
     setError("");
     try {
       setAppliedFilters(cleanFilters(filters));
+      setTechnicianPage(0);
     } catch (err) {
       setError(err.message);
     }
@@ -343,6 +312,7 @@ export default function Reports() {
   function clearFilters() {
     setFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
+    setTechnicianPage(0);
   }
 
   async function exportPdf() {
@@ -369,7 +339,7 @@ export default function Reports() {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = "HelpWeb Health - Relatório";
+    document.title = "HELP WEB HEALTH - Relatório";
     return () => {
       document.title = previousTitle;
     };
@@ -517,7 +487,7 @@ export default function Reports() {
                     maxLength={REPORT_LIMITS.sector}
                   />
                   <datalist id="report-sector-options">
-                    {SECTOR_OPTIONS.map((option) => (
+                    {catalog.sectors.map((option) => (
                       <option key={option} value={option} />
                     ))}
                   </datalist>
@@ -533,7 +503,7 @@ export default function Reports() {
                     maxLength={REPORT_LIMITS.category}
                   />
                   <datalist id="report-category-options">
-                    {CATEGORY_OPTIONS.map((option) => (
+                    {catalog.categories.map((option) => (
                       <option key={option} value={option} />
                     ))}
                   </datalist>
@@ -549,7 +519,7 @@ export default function Reports() {
         {data && !loading && (
           <section className="report-export-area">
             <div className="report-print-header only-print">
-              <h1>HelpWeb Health</h1>
+              <h1>HELP WEB HEALTH</h1>
               <p>Relatório de chamados de suporte técnico</p>
             </div>
 
@@ -657,25 +627,13 @@ export default function Reports() {
               scope={panelScope}
               title="Indicadores de apoio"
               icon="chart"
-              className="panel report-more-metrics"
+              className="report-more-metrics report-support-indicators"
             >
-              <div className="report-more-grid">
-                <section>
-                  <h4>Situação da fila</h4>
-                  <MetricRows data={data.queue_snapshot} preserveOrder />
-                </section>
-                <section>
-                  <h4>Idade dos chamados ativos</h4>
-                  <MetricRows data={data.active_age_counts} preserveOrder />
-                </section>
-                <section>
-                  <h4>Equipamentos recorrentes</h4>
-                  <MetricRows data={data.equipment_counts} />
-                </section>
-                <section>
-                  <h4>Evolução por dia</h4>
-                  <MetricRows data={data.daily_counts} preserveOrder initialLimit={14} maxItems={14} latest />
-                </section>
+              <div className="report-more-grid report-support-grid">
+                <SupportingIndicator title="Situação da fila" icon={Activity} data={data.queue_snapshot} preserveOrder />
+                <SupportingIndicator title="Tempo em aberto" icon={Clock} data={data.active_age_counts} preserveOrder />
+                <SupportingIndicator title="Equipamentos com mais chamados" icon={Monitor} data={data.equipment_counts} />
+                <SupportingIndicator title={data.activity_series?.title || "Evolução no período"} icon={ChartColumn} data={data.activity_series?.counts} preserveOrder />
               </div>
             </CollapsiblePanel>
 
@@ -693,6 +651,14 @@ export default function Reports() {
                   </div>
                 )}
               >
+                {isAdmin && (
+                  <div className="catalog-list-tools no-print">
+                    <label htmlFor="report-technician-search">Buscar técnico
+                      <input id="report-technician-search" type="search" value={technicianSearch} maxLength={100} onChange={event => { setTechnicianSearch(event.target.value); setTechnicianPage(0); }} />
+                    </label>
+                    <label className="catalog-checkbox"><input type="checkbox" checked={showIdleTechnicians} onChange={event => { setShowIdleTechnicians(event.target.checked); setTechnicianPage(0); }} /> Incluir sem atendimentos</label>
+                  </div>
+                )}
                 <div className="report-table-wrap">
                   <table className="report-data-table">
                     <thead>
@@ -704,7 +670,7 @@ export default function Reports() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.technicians.map((tech) => (
+                      {visibleTechnicians.map((tech) => (
                         <tr key={tech.id}>
                           <th scope="row">{safeReportLabel(tech.name, 100)}</th>
                           <td>{tech.assigned_total}</td>
@@ -712,10 +678,15 @@ export default function Reports() {
                           <td>{tech.closed_total}</td>
                         </tr>
                       ))}
+                      {!visibleTechnicians.length && <tr><td colSpan={4}>Nenhum técnico neste recorte.</td></tr>}
                     </tbody>
                   </table>
                 </div>
+                <ListPagination page={currentTechnicianPage} pageSize={TECHNICIAN_PAGE_SIZE} total={technicians.length} onChange={setTechnicianPage} />
               </CollapsiblePanel>
+            )}
+            {isAdmin && data.non_technician_assigned_total > 0 && (
+              <p className="report-metric-note">{data.non_technician_assigned_total} chamados atribuídos a administradores ou outros perfis estão incluídos nos totais gerais, fora da tabela de técnicos.</p>
             )}
           </section>
         )}

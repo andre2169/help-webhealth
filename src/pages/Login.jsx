@@ -6,6 +6,8 @@ import { confirmAccountRecovery, requestAccountRecovery } from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { validateEmail, validatePassword } from "../utils/validation";
 import ThemeToggle from "../components/ThemeToggle";
+import BrandLogo from "../components/BrandLogo";
+import SiteFooter from "../components/SiteFooter";
 
 function secondsFromVerification(result) {
   return Math.max(0, Number(result?.expires_in_minutes || 0) * 60);
@@ -26,6 +28,10 @@ function verificationMessage(result, fallback) {
   const minutes = result?.expires_in_minutes;
   const expiration = minutes ? ` O código expira em ${minutes} minutos.` : "";
   return `${result?.message || fallback}${expiration}`;
+}
+
+function isValidLoginMfaCode(value) {
+  return /^\d{6}$/.test(value) || /^[A-F0-9]{4}(?:-[A-F0-9]{4}){2}$/.test(value);
 }
 
 export default function Login() {
@@ -208,16 +214,11 @@ export default function Login() {
     <div className="auth-shell auth-shell-modern">
       <div className="auth-theme-control"><ThemeToggle compact /></div>
       <div className="card auth-card">
-        <div className="card-brand">
-          <div className="card-brand-mark"><Icon name="shield" size={20} /></div>
-          <div>
-            <strong style={{ display: "block", fontFamily: "var(--font-display)" }}>
-              HelpWeb Health
-            </strong>
-          </div>
+        <div className="card-brand auth-brand">
+          <BrandLogo full className="auth-brand-logo" />
         </div>
 
-        <h1>{isRecovery ? "Recuperar conta" : loginChallenge ? "Confirmar acesso" : "Entrar na conta"}</h1>
+        <h1>{isRecovery ? "Recuperar conta" : loginChallenge ? "Confirmar acesso" : "Login"}</h1>
         <p>
           {isRecovery
             ? "Receba um código no email cadastrado para redefinir sua senha."
@@ -256,15 +257,15 @@ export default function Login() {
                 <input
                   id="login-mfa-code"
                   type="text"
-                  inputMode="numeric"
+                  inputMode="text"
                   autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
+                  pattern="(?:[0-9]{6}|[A-Fa-f0-9]{4}(?:-[A-Fa-f0-9]{4}){2})"
+                  maxLength={14}
                   value={loginMfaCode}
                   onChange={(event) =>
-                    setLoginMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                    setLoginMfaCode(event.target.value.toUpperCase().replace(/[^A-F0-9-]/g, "").slice(0, 14))
                   }
-                  placeholder="000000"
+                  placeholder="000000 ou XXXX-XXXX-XXXX"
                   required
                 />
               </>
@@ -273,7 +274,7 @@ export default function Login() {
             {error && <p className="error">{error}</p>}
             {loginNotice && <p className="success compact-feedback">{loginNotice}</p>}
 
-            <button type="submit" className="full" disabled={submitting}>
+            <button type="submit" className="full" disabled={submitting || (loginChallenge && !isValidLoginMfaCode(loginMfaCode))}>
               <Icon name={loginChallenge ? "shield" : "logIn"} />
               {submitting
                 ? loginChallenge ? "Confirmando…" : "Entrando…"
@@ -405,6 +406,7 @@ export default function Login() {
           )}
         </div>
       </div>
+      <SiteFooter />
     </div>
   );
 }

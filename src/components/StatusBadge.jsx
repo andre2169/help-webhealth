@@ -4,6 +4,7 @@ const LABELS = {
   resolved: "Resolvido",
   closed: "Fechado",
   reopened: "Reaberto",
+  cancelled: "Cancelado",
 };
 
 export default function StatusBadge({ status }) {

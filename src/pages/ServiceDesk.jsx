@@ -3,8 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { assignTicket, getDashboardSummary, resolveTicket } from "../api/api";
 import Icon from "../components/Icon";
 import StatusBadge from "../components/StatusBadge";
+import SlaCountdown from "../components/SlaCountdown";
 import Topbar from "../components/Topbar";
 import { formatTicketCode } from "../utils/ticketCode";
+
+function sortBySla(tickets = []) {
+  return [...tickets].sort((left, right) => {
+    const a = left.due_at ? new Date(left.due_at).getTime() : Number.POSITIVE_INFINITY;
+    const b = right.due_at ? new Date(right.due_at).getTime() : Number.POSITIVE_INFINITY;
+    return a - b;
+  });
+}
 
 export default function ServiceDesk() {
   const navigate = useNavigate();
@@ -47,19 +56,28 @@ export default function ServiceDesk() {
         {data && (
           <div className="dashboard-grid">
             <section className="panel">
-              <h3>
-                <Icon name="headset" />
-                Fila aberta
-              </h3>
+              <div className="service-desk-panel-heading">
+                <h3>
+                  <Icon name="headset" />
+                  Fila aberta
+                </h3>
+                <span className="service-desk-panel-count">{data.technician_queue.length} na fila</span>
+              </div>
               <div className="action-list">
-                {data.technician_queue.map((ticket) => (
+                {sortBySla(data.technician_queue).map((ticket) => (
                   <div className="action-row" key={ticket.id}>
-                    <button className="ghost" onClick={() => navigate(`/tickets/${ticket.id}`)}>
+                    <button className="action-row-ticket ghost" onClick={() => navigate(`/tickets/${ticket.id}`)}>
                       <span className="ticket-action-title"><span className="ticket-code">{formatTicketCode(ticket.id)}</span><span>{ticket.title}</span></span>
+                      <span className="action-row-context">
+                        {ticket.sector || "Setor não informado"} · {ticket.category || "Categoria não informada"}
+                      </span>
                     </button>
-                    <StatusBadge status={ticket.status} />
+                    <div className="action-row-state">
+                      <StatusBadge status={ticket.status} />
+                      <SlaCountdown ticket={ticket} compact />
+                    </div>
                     <button
-                      className="small"
+                      className="action-row-action small"
                       disabled={busyId === ticket.id}
                       onClick={() => run(ticket.id, assignTicket)}
                     >
@@ -73,19 +91,28 @@ export default function ServiceDesk() {
             </section>
 
             <section className="panel">
-              <h3>
-                <Icon name="activity" />
-                Minha fila ativa
-              </h3>
+              <div className="service-desk-panel-heading">
+                <h3>
+                  <Icon name="activity" />
+                  Minha fila ativa
+                </h3>
+                <span className="service-desk-panel-count">{data.my_active_tickets.length} em atendimento</span>
+              </div>
               <div className="action-list">
-                {data.my_active_tickets.map((ticket) => (
+                {sortBySla(data.my_active_tickets).map((ticket) => (
                   <div className="action-row" key={ticket.id}>
-                    <button className="ghost" onClick={() => navigate(`/tickets/${ticket.id}`)}>
+                    <button className="action-row-ticket ghost" onClick={() => navigate(`/tickets/${ticket.id}`)}>
                       <span className="ticket-action-title"><span className="ticket-code">{formatTicketCode(ticket.id)}</span><span>{ticket.title}</span></span>
+                      <span className="action-row-context">
+                        {ticket.sector || "Setor não informado"} · {ticket.category || "Categoria não informada"}
+                      </span>
                     </button>
-                    <StatusBadge status={ticket.status} />
+                    <div className="action-row-state">
+                      <StatusBadge status={ticket.status} />
+                      <SlaCountdown ticket={ticket} compact />
+                    </div>
                     <button
-                      className="small accent"
+                      className="action-row-action small accent"
                       disabled={busyId === ticket.id}
                       onClick={() => run(ticket.id, resolveTicket)}
                     >

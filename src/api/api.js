@@ -1,6 +1,34 @@
-const API_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
-).replace(/\/$/, "");
+function resolveApiUrl() {
+  const configuredUrl = (
+    import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+  ).replace(/\/$/, "");
+
+  if (typeof window === "undefined") return configuredUrl;
+
+  try {
+    const apiUrl = new URL(configuredUrl);
+    const pageHost = window.location.hostname;
+    const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+
+    // Keep local PWA sessions on one host when the app was installed via
+    // localhost or 127.0.0.1; browsers treat those hosts as different sites.
+    if (
+      apiUrl.protocol === "http:" &&
+      localHosts.has(apiUrl.hostname.replace(/^\[|\]$/g, "")) &&
+      localHosts.has(pageHost.replace(/^\[|\]$/g, ""))
+    ) {
+      apiUrl.hostname = pageHost;
+      return apiUrl.toString().replace(/\/$/, "");
+    }
+  } catch {
+    // Keep the configured value if an invalid URL is supplied; the request
+    // handler will show the regular API connection error to the user.
+  }
+
+  return configuredUrl;
+}
+
+const API_URL = resolveApiUrl();
 const API_BASE_URL = API_URL.replace(/\/api\/v1$/, "");
 const LEGACY_AUTH_TOKEN_KEYS = ["helpwebhealth_token", "token"];
 const CSRF_COOKIE_NAME = import.meta.env.VITE_CSRF_COOKIE_NAME || "helpwebhealth_csrf";
@@ -536,6 +564,7 @@ export const assignTicket = (ticketId) => patchTicket(ticketId, "assign");
 export const resolveTicket = (ticketId) => patchTicket(ticketId, "resolve");
 export const closeTicket = (ticketId) => patchTicket(ticketId, "close");
 export const reopenTicket = (ticketId) => patchTicket(ticketId, "reopen");
+export const cancelTicket = (ticketId) => patchTicket(ticketId, "cancel");
 
 export async function deleteTicket(ticketId) {
   const response = await fetch(`${API_URL}/tickets/${ticketId}`, {
@@ -604,6 +633,43 @@ export async function markAllNotificationsRead() {
 /* ---------- Dashboard / Relatórios ---------- */
 export async function getDashboardSummary() {
   return cachedGetJson(`${API_URL}/dashboard/summary`);
+}
+
+export async function getActiveMaintenanceNotices({ signal } = {}) {
+  return getJson(`${API_URL}/maintenance-notices/`, { signal });
+}
+
+export const MAINTENANCE_NOTICES_UPDATED_EVENT = "helpwebhealth:maintenance-notices-updated";
+
+function notifyMaintenanceNoticesUpdated() {
+  clearApiGetCache();
+  window.dispatchEvent(new Event(MAINTENANCE_NOTICES_UPDATED_EVENT));
+}
+
+export async function markMaintenanceNoticeRead(noticeId, revision) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/maintenance-notices/${noticeId}/read`, {
+    method: "POST", credentials: "include", headers: getAuthHeaders(), body: JSON.stringify({ revision }),
+  });
+  try { await handle(response); }
+  catch (error) { error.status = response.status; throw error; }
+  notifyMaintenanceNoticesUpdated();
+}
+
+export async function getMfaRecoveryCodeStatus() {
+  return cachedGetJson(`${API_URL}/auth/mfa/recovery-codes`, { ttl: 1000 });
+}
+
+export async function generateMfaRecoveryCodes(currentPassword) {
+  const response = await fetch(`${API_URL}/auth/mfa/recovery-codes`, {
+    method: "POST",
+    credentials: "include",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ current_password: currentPassword }),
+  });
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
 }
 
 export async function getReportsOverview({
@@ -692,6 +758,102 @@ export async function adminListTicketEventSummaries({
   if (search) params.append("search", search);
 
   return getJson(`${API_URL}/admin/ticket-events?${params.toString()}`, { signal });
+}
+
+export async function adminListMaintenanceNotices({ limit = 100 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return getJson(`${API_URL}/admin/maintenance-notices/?${params.toString()}`);
+}
+
+export async function getTicketCatalog({ includeInactive = false } = {}) {
+  return getJson(`${API_URL}/ticket-catalog/?include_inactive=${includeInactive}`);
+}
+
+export async function adminCreateCatalogOption({ kind, name }) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/ticket-catalog/`, {
+    method: "POST", credentials: "include", headers: getAuthHeaders(),
+    body: JSON.stringify({ kind, name }),
+  });
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
+}
+
+export async function adminSetCatalogOptionActive(id, active) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/ticket-catalog/${id}/active`, {
+    method: "PATCH", credentials: "include", headers: getAuthHeaders(),
+    body: JSON.stringify({ active }),
+  });
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
+}
+
+export async function adminRenameCatalogOption(id, name) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/ticket-catalog/${id}`, {
+    method: "PATCH", credentials: "include", headers: getAuthHeaders(),
+    body: JSON.stringify({ name }),
+  });
+  const data = await handle(response);
+  clearApiGetCache();
+  return data;
+}
+
+export async function adminDeleteCatalogOption(id) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/ticket-catalog/${id}`, {
+    method: "DELETE", credentials: "include", headers: getAuthHeaders(),
+  });
+  await handle(response);
+  clearApiGetCache();
+}
+
+export async function adminCreateMaintenanceNotice(notice) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/maintenance-notices/`, {
+    method: "POST",
+    credentials: "include",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(notice),
+  });
+  const data = await handle(response);
+  notifyMaintenanceNoticesUpdated();
+  return data;
+}
+
+export async function adminSetMaintenanceNoticeActive(noticeId, active) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/maintenance-notices/${noticeId}/active`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ active }),
+  });
+  const data = await handle(response);
+  notifyMaintenanceNoticesUpdated();
+  return data;
+}
+
+export async function adminUpdateMaintenanceNotice(noticeId, notice) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/maintenance-notices/${noticeId}`, {
+    method: "PATCH", credentials: "include", headers: getAuthHeaders(), body: JSON.stringify(notice),
+  });
+  const data = await handle(response);
+  notifyMaintenanceNoticesUpdated();
+  return data;
+}
+
+export async function adminDeleteMaintenanceNotice(noticeId) {
+  await ensureCsrfToken();
+  const response = await fetch(`${API_URL}/admin/maintenance-notices/${noticeId}`, {
+    method: "DELETE", credentials: "include", headers: getAuthHeaders(),
+  });
+  await handle(response);
+  notifyMaintenanceNoticesUpdated();
 }
 
 export async function adminRestoreDeletedTicket(ticketId) {

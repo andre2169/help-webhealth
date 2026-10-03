@@ -24,5 +24,5 @@ jobs:
       - name: Run frontend checks
         run: npm run check
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
+      - name: Audit application and build dependencies
+        run: npm audit

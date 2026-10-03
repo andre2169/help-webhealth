@@ -278,6 +278,12 @@ const ICONS = {
       <path d="m6 6 12 12" />
     </>
   ),
+  copy: (
+    <>
+      <rect x="8" y="8" width="11" height="11" rx="2" />
+      <path d="M5 16H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1" />
+    </>
+  ),
   zoomIn: (
     <>
       <circle cx="11" cy="11" r="7" />

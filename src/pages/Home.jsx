@@ -29,6 +29,11 @@ export default function Home() {
   const isSupportRole = user?.role === "technician" || user?.role === "admin";
   const isAdmin = user?.role === "admin";
   const needsEmailVerification = user && !user.email_verified;
+  const welcomeText = isAdmin
+    ? "Acompanhe a operação de TI, as prioridades da fila e os resultados da equipe."
+    : isSupportRole
+      ? "Organize seus atendimentos, acompanhe os prazos e assuma as próximas solicitações."
+      : "Precisa de ajuda com TI? Abra uma solicitação e acompanhe aqui as respostas da equipe.";
 
   useEffect(() => {
     let active = true;
@@ -61,9 +66,17 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [isSupportRole]);
+  }, [isSupportRole, user?.id]);
 
   const quickActions = useMemo(() => {
+    if (isAdmin) {
+      return [
+        { icon: "dashboard", title: "Dashboard", text: "Visão geral da operação e dos prazos.", to: "/dashboard" },
+        { icon: "headset", title: "Atendimento", text: "Acompanhar a fila de solicitações.", to: "/atendimento" },
+        { icon: "reports", title: "Relatórios", text: "Resultados por período, setor e equipe.", to: "/relatorios" },
+        { icon: "users", title: "Usuários", text: "Gerenciar contas e permissões.", to: "/admin/usuarios" },
+      ];
+    }
     if (isSupportRole) {
       return [
         {
@@ -119,25 +132,22 @@ export default function Home() {
 
   return (
     <>
-      <Topbar title="Início" subtitle="HelpWeb Health" />
+      <Topbar title="Início" subtitle="HELP WEB HEALTH" />
       <main className="main home-page">
         <section className="home-hero">
           <div className="home-hero-copy">
             <span className="home-eyebrow">{ROLE_LABELS[user?.role] || "Acesso"}</span>
             <h2>Olá, {firstName(user?.name)}</h2>
-            <p>
-              Central de chamados de TI para unidades de saúde, com registro simples,
-              acompanhamento por status e apoio à equipe técnica.
-            </p>
+            <p>{welcomeText}</p>
           </div>
           <div className="home-hero-actions">
-            <button onClick={() => navigate(needsEmailVerification ? "/perfil" : "/tickets/novo")}>
-              <Icon name={needsEmailVerification ? "shield" : "plus"} />
-              {needsEmailVerification ? "Confirmar email" : "Novo chamado"}
+            <button onClick={() => navigate(isAdmin ? "/dashboard" : isSupportRole ? "/atendimento" : needsEmailVerification ? "/perfil" : "/tickets/novo")}>
+              <Icon name={isAdmin ? "dashboard" : isSupportRole ? "headset" : needsEmailVerification ? "shield" : "plus"} />
+              {isAdmin ? "Visão da operação" : isSupportRole ? "Ir para atendimento" : needsEmailVerification ? "Confirmar email" : "Novo chamado"}
             </button>
             <button className="secondary" onClick={() => navigate("/tickets")}>
               <Icon name="ticket" />
-              Ver chamados
+              {isSupportRole ? "Ver chamados" : "Meus chamados"}
             </button>
           </div>
         </section>
@@ -145,13 +155,13 @@ export default function Home() {
         {error && <p className="error">{error}</p>}
         {loading && <p className="loading-line">Carregando início…</p>}
 
-        {!loading && (
+        {!loading && !error && (
           <>
             <div className="home-stat-grid">
               <div className="summary-card home-stat-card">
                 <div className="summary-card-head">
                   <Icon name="ticket" />
-                  <span>{isSupportRole ? "chamados visíveis" : "meus chamados"}</span>
+                  <span>{isAdmin ? "chamados da operação" : isSupportRole ? "meus atendimentos" : "meus chamados"}</span>
                 </div>
                 <strong>{summary?.total ?? totalTickets}</strong>
               </div>
@@ -162,14 +172,14 @@ export default function Home() {
                       <Icon name="headset" />
                       <span>fila aberta</span>
                     </div>
-                    <strong>{summary?.technician_queue?.length || 0}</strong>
+                    <strong>{summary?.technician_queue_total ?? 0}</strong>
                   </div>
                   <div className="summary-card home-stat-card">
                     <div className="summary-card-head">
                       <Icon name="activity" />
-                      <span>minha fila</span>
+                      <span>{isAdmin ? "em andamento" : "minha fila"}</span>
                     </div>
-                    <strong>{summary?.my_active_tickets?.length || 0}</strong>
+                    <strong>{isAdmin ? summary?.by_status?.in_progress ?? 0 : summary?.my_active_total ?? 0}</strong>
                   </div>
                   <div className="summary-card home-stat-card">
                     <div className="summary-card-head">
@@ -179,24 +189,7 @@ export default function Home() {
                     <strong>{summary?.sla?.overdue || 0}</strong>
                   </div>
                 </>
-              ) : (
-                <>
-                  <div className="summary-card home-stat-card">
-                    <div className="summary-card-head">
-                      <Icon name="clock" />
-                      <span>recentes</span>
-                    </div>
-                    <strong>{tickets.length}</strong>
-                  </div>
-                  <div className="summary-card home-stat-card">
-                    <div className="summary-card-head">
-                      <Icon name="shield" />
-                      <span>perfil</span>
-                    </div>
-                    <strong>{user?.unit_name ? "OK" : "-"}</strong>
-                  </div>
-                </>
-              )}
+              ) : null}
             </div>
 
             <div className="home-action-grid">
@@ -216,21 +209,6 @@ export default function Home() {
                   </span>
                 </button>
               ))}
-              {user?.role === "admin" && (
-                <button
-                  type="button"
-                  className="home-action-card"
-                  onClick={() => navigate("/admin/usuarios")}
-                >
-                  <span className="home-action-icon">
-                    <Icon name="users" />
-                  </span>
-                  <span>
-                    <strong>Usuários</strong>
-                    <small>Perfis, funções e permissões.</small>
-                  </span>
-                </button>
-              )}
             </div>
 
             <div className="dashboard-grid home-dashboard-grid">
@@ -258,12 +236,22 @@ export default function Home() {
               <section className="panel home-guidance-panel">
                 <h3>
                   <Icon name="shield" />
-                  Antes de registrar
+                  {isAdmin ? "Prioridades da operação" : isSupportRole ? "Foco no atendimento" : "Antes de registrar"}
                 </h3>
                 <div className="home-guidance-list">
-                  <span>Informe setor, equipamento e impacto no atendimento.</span>
-                  <span>Anexe foto quando ela ajudar a identificar o problema.</span>
-                  <span>Não inclua nome, documento ou dado clínico de paciente.</span>
+                  {isSupportRole ? (
+                    <>
+                      <span>{isAdmin ? "Acompanhe chamados críticos e prazos vencidos." : "Priorize o impacto no atendimento e o prazo SLA."}</span>
+                      <span>{isAdmin ? "Mantenha setores, categorias e permissões atualizados." : "Registre o diagnóstico e as ações no histórico do chamado."}</span>
+                      <span>Preserve a privacidade: não registre dados de pacientes.</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Informe setor, equipamento e o que não está funcionando.</span>
+                      <span>Anexe uma foto se ela ajudar a identificar o problema.</span>
+                      <span>Não inclua nome, documento ou dado clínico de paciente.</span>
+                    </>
+                  )}
                 </div>
               </section>
             </div>

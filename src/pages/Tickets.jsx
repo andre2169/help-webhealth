@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Info } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   adminRestoreDeletedTicket,
@@ -10,10 +11,12 @@ import {
 import CollapsiblePanel from "../components/CollapsiblePanel";
 import Icon from "../components/Icon";
 import StatusBadge from "../components/StatusBadge";
+import SlaCountdown from "../components/SlaCountdown";
 import Topbar from "../components/Topbar";
 import { useAuth } from "../context/AuthContext";
 import { formatApiDate, formatApiDateTime } from "../utils/dateTime";
 import { formatTicketCode } from "../utils/ticketCode";
+import useTicketCatalog from "../hooks/useTicketCatalog";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Todos" },
@@ -22,7 +25,7 @@ const STATUS_OPTIONS = [
   { value: "resolved", label: "Resolvido" },
   { value: "closed", label: "Fechado" },
   { value: "reopened", label: "Reaberto" },
-  { value: "deleted", label: "Excluído" },
+  { value: "deleted", label: "Excluídos e cancelados" },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -41,36 +44,6 @@ const IMPACT_OPTIONS = [
   { value: "critical", label: "Crítico" },
 ];
 
-const CATEGORY_OPTIONS = [
-  "Infraestrutura",
-  "Rede",
-  "Hardware",
-  "Software hospitalar",
-  "Impressão",
-  "Acesso",
-  "Telefonia",
-  "Internet",
-  "Segurança",
-  "Periféricos",
-  "Sistema de gestão hospitalar",
-  "Leitor ou coletor",
-];
-
-const SECTOR_OPTIONS = [
-  "Recepção",
-  "UTI",
-  "Enfermaria",
-  "Laboratório",
-  "Farmácia",
-  "Centro Cirúrgico",
-  "Pronto Atendimento",
-  "Radiologia",
-  "Ambulatório",
-  "Almoxarifado",
-  "Administrativo",
-  "TI",
-];
-
 const PAGE_SIZE = 10;
 const FILTER_LIMITS = {
   category: 40,
@@ -82,6 +55,7 @@ export default function Tickets() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const catalog = useTicketCatalog({ includeInactive: true });
   const panelScope = String(user?.id ?? "session");
 
   const initialSearch = searchParams.get("search") || "";
@@ -100,7 +74,7 @@ export default function Tickets() {
   const [sectorInput, setSectorInput] = useState(initialSector);
   const [sector, setSector] = useState(initialSector.trim());
   const [operationalImpact, setOperationalImpact] = useState(initialImpact);
-  const [direction, setDirection] = useState("desc");
+  const [sortMode, setSortMode] = useState("newest");
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(null);
   const [hasMore, setHasMore] = useState(false);
@@ -156,7 +130,8 @@ export default function Tickets() {
       category,
       sector,
       operationalImpact,
-      direction,
+      orderBy: sortMode === "sla" && !isDeletedView ? "due_at" : "created_at",
+      direction: sortMode === "oldest" || sortMode === "sla" ? "asc" : "desc",
       skip: page * PAGE_SIZE,
       limit: PAGE_SIZE,
       signal: controller.signal,
@@ -185,7 +160,7 @@ export default function Tickets() {
       active = false;
       controller.abort();
     };
-  }, [search, status, priority, category, sector, operationalImpact, direction, page, reloadKey]);
+  }, [search, status, priority, category, sector, operationalImpact, sortMode, page, reloadKey]);
 
   useEffect(() => {
     if (!selectedTicket) {
@@ -229,6 +204,12 @@ export default function Tickets() {
   const openCount = isDeletedView ? null : tickets.filter((t) => t.status === "open").length;
   const hasFilters = Boolean(searchInput || status || priority || categoryInput || sectorInput || operationalImpact);
   const visibleTotal = total === null ? `${tickets.length}${hasMore ? "+" : ""}` : total;
+  const statusLabel = STATUS_OPTIONS.find((option) => option.value === status)?.label;
+  const filterNotice = isDeletedView
+    ? "Excluídos e cancelados ficam apenas para consulta e não entram nos indicadores. Somente o administrador pode recuperá-los."
+    : status
+      ? `Exibindo chamados com status ${statusLabel || status}, conforme os demais filtros. Excluídos e cancelados não aparecem nesta lista.`
+      : "Todos os status inclui chamados abertos, em andamento, reabertos, resolvidos e fechados. Excluídos e cancelados ficam no filtro próprio e não entram nos indicadores.";
 
   function clearFilters() {
     setSearchInput("");
@@ -273,8 +254,10 @@ export default function Tickets() {
 
   async function restoreTicket() {
     if (!ticketDetail || restoring || user?.role !== "admin") return;
+    const restoredStatus = ticketDetail.status === "cancelled" ? "open" : ticketDetail.status;
+    const restoredLabel = STATUS_OPTIONS.find((option) => option.value === restoredStatus)?.label || restoredStatus;
     const confirmed = window.confirm(
-      `Recuperar ${formatTicketCode(ticketDetail.id)}? Ele voltará com o status ${STATUS_OPTIONS.find((option) => option.value === ticketDetail.status)?.label || ticketDetail.status}.`
+      `Recuperar ${formatTicketCode(ticketDetail.id)}? Ele voltará com o status ${restoredLabel}.`
     );
     if (!confirmed) return;
 
@@ -283,7 +266,7 @@ export default function Tickets() {
     try {
       await adminRestoreDeletedTicket(ticketDetail.id);
       setSelectedTicket(null);
-      setNotice(`${formatTicketCode(ticketDetail.id)} foi recuperado com o status original.`);
+      setNotice(`${formatTicketCode(ticketDetail.id)} foi recuperado como ${restoredLabel}.`);
       setReloadKey((value) => value + 1);
     } catch (err) {
       setDetailError(err.message || "Não foi possível recuperar o chamado.");
@@ -295,15 +278,15 @@ export default function Tickets() {
   return (
     <>
       <Topbar
-        title={isDeletedView ? "Chamados excluídos" : user?.role === "user" ? "Meus chamados" : "Chamados"}
+        title={isDeletedView ? "Excluídos e cancelados" : user?.role === "user" ? "Meus chamados" : "Chamados"}
         subtitle={isDeletedView ? "Consulta de chamados arquivados" : "Acompanhe e gerencie as solicitações de suporte"}
       />
 
       <main className="main">
         <div className="page-title">
           <div>
-            <h2>{isDeletedView ? "Chamados excluídos" : user?.role === "user" ? "Meus chamados" : "Todos os chamados"}</h2>
-            <p>{visibleTotal} chamado{total === 1 ? "" : "s"} nesta página</p>
+            <h2>{isDeletedView ? "Excluídos e cancelados" : user?.role === "user" ? "Meus chamados" : "Chamados"}</h2>
+            <p>{tickets.length} chamado{tickets.length === 1 ? "" : "s"} nesta página</p>
           </div>
           <button onClick={() => navigate("/tickets/novo")}>
             <Icon name="plus" />
@@ -368,8 +351,9 @@ export default function Tickets() {
           </div>
 
           <div>
-            <label>Status</label>
+            <label htmlFor="ticket-status">Status</label>
             <select
+              id="ticket-status"
               value={status}
               onChange={(e) => changeStatusFilter(e.target.value)}
             >
@@ -425,7 +409,7 @@ export default function Tickets() {
               maxLength={FILTER_LIMITS.category}
             />
             <datalist id="ticket-filter-category-options">
-              {CATEGORY_OPTIONS.map((opt) => (
+              {catalog.categories.map((opt) => (
                 <option key={opt} value={opt} />
               ))}
             </datalist>
@@ -441,7 +425,7 @@ export default function Tickets() {
               maxLength={FILTER_LIMITS.sector}
             />
             <datalist id="ticket-filter-sector-options">
-              {SECTOR_OPTIONS.map((opt) => (
+              {catalog.sectors.map((opt) => (
                 <option key={opt} value={opt} />
               ))}
             </datalist>
@@ -450,14 +434,15 @@ export default function Tickets() {
           <div>
             <label>Ordenação</label>
             <select
-              value={direction}
+              value={sortMode}
               onChange={(e) => {
-                setDirection(e.target.value);
+                setSortMode(e.target.value);
                 setPage(0);
               }}
             >
-              <option value="desc">Mais recentes primeiro</option>
-              <option value="asc">Mais antigos primeiro</option>
+              <option value="newest">Mais recentes primeiro</option>
+              <option value="oldest">Mais antigos primeiro</option>
+              {!isDeletedView && user?.role !== "user" && <option value="sla">Maior risco de SLA</option>}
             </select>
           </div>
 
@@ -475,12 +460,16 @@ export default function Tickets() {
         </div>
         </CollapsiblePanel>
 
+        <div className="ticket-filter-notice" role="note">
+          <Info className="icon" size={18} aria-hidden="true" />
+          <p><strong>Sobre esta lista</strong><span>{filterNotice}</span></p>
+        </div>
         {error && <p className="error">{error}</p>}
 
         <CollapsiblePanel
           storageKey="tickets.results"
           scope={panelScope}
-          title={isDeletedView ? "Chamados excluídos" : "Chamados encontrados"}
+          title={isDeletedView ? "Excluídos e cancelados" : "Chamados encontrados"}
           icon="ticket"
           subtitle={`${visibleTotal} resultado${total === 1 ? "" : "s"}`}
           className="ticket-results-panel"
@@ -491,7 +480,7 @@ export default function Tickets() {
             <span>Chamado</span>
             <span>Status</span>
             <span>Responsável</span>
-            <span>{isDeletedView ? "Excluído em" : "Aberto em"}</span>
+            <span>{isDeletedView ? "Arquivado em" : "Aberto em"}</span>
           </div>
 
           {loading && <p className="loading-line" style={{ padding: "16px 18px" }}>Carregando chamados…</p>}
@@ -513,7 +502,8 @@ export default function Tickets() {
                 </span>
                 <span className="ticket-row-status">
                   <StatusBadge status={ticket.status} />
-                  {ticket.is_deleted && <small className="ticket-deleted-label"><Icon name="trash" size={12} />Excluído</small>}
+                  {!ticket.is_deleted && <SlaCountdown ticket={ticket} compact />}
+                  {ticket.is_deleted && ticket.status !== "cancelled" && <small className="ticket-deleted-label"><Icon name="trash" size={12} />Excluído</small>}
                 </span>
                 <span className="ticket-row-meta">
                   {ticket.technician_name || (ticket.technician_id ? "Equipe técnica" : "Não atribuído")}
@@ -524,10 +514,10 @@ export default function Tickets() {
               </button>
             ))}
 
-          {!loading && tickets.length === 0 && (
+          {!loading && !error && tickets.length === 0 && (
             <div className="empty-state">
-              <strong>{isDeletedView ? "Nenhum chamado excluído encontrado" : "Nenhum chamado encontrado"}</strong>
-              <p>{isDeletedView ? "Tente ajustar a pesquisa ou os filtros." : "Ajuste os filtros ou crie um novo chamado."}</p>
+              <strong>{hasFilters ? "Nenhum chamado corresponde a esta seleção" : "Nenhum chamado nesta lista"}</strong>
+              <p>{isDeletedView ? "Não há chamados arquivados para esta seleção." : hasFilters ? "Altere ou limpe os filtros para consultar outros chamados." : user?.role === "user" ? "Você pode abrir uma solicitação quando precisar de suporte de TI." : "Não há solicitações disponíveis no seu escopo de atendimento."}</p>
             </div>
           )}
         </div>
@@ -576,7 +566,7 @@ export default function Tickets() {
             {ticketDetail && !detailLoading && (
               <>
                 <div className="admin-event-modal-summary">
-                  <div><small>{selectedTicket.is_deleted ? "Status ao excluir" : "Status"}</small><StatusBadge status={ticketDetail.status} /></div>
+                  <div><small>{selectedTicket.is_deleted ? "Status arquivado" : "Status"}</small><StatusBadge status={ticketDetail.status} /></div>
                   <div><small>Prioridade</small><strong>{PRIORITY_OPTIONS.find((option) => option.value === ticketDetail.priority)?.label || ticketDetail.priority}</strong></div>
                   <div><small>Setor</small><strong>{ticketDetail.sector || "Não informado"}</strong></div>
                   <div><small>Categoria</small><strong>{ticketDetail.category || "Não informada"}</strong></div>
@@ -588,26 +578,26 @@ export default function Tickets() {
                   {selectedTicket.is_deleted && (
                     <div className="ticket-deleted-warning" role="status">
                       <Icon name="trash" size={16} />
-                      <span>Este chamado foi excluído e está em modo de consulta.</span>
+                      <span>Este chamado foi {ticketDetail.status === "cancelled" ? "cancelado" : "excluído"} e está em modo de consulta.</span>
                     </div>
                   )}
                   <div className="admin-event-modal-title-row">
                     <h4><Icon name="ticket" /> Informações do chamado</h4>
-                    <span>{selectedTicket.is_deleted ? `Excluído em ${formatApiDateTime(ticketDetail.deleted_at)}` : `Criado em ${formatApiDateTime(ticketDetail.created_at)}`}</span>
+                    <span>{selectedTicket.is_deleted ? `Arquivado em ${formatApiDateTime(ticketDetail.deleted_at)}` : `Criado em ${formatApiDateTime(ticketDetail.created_at)}`}</span>
                   </div>
                   <p className="ticket-deleted-modal-description">{ticketDetail.description}</p>
                   <dl className="ticket-deleted-modal-meta">
                     <div><dt>Criado em</dt><dd>{formatApiDateTime(ticketDetail.created_at)}</dd></div>
                     <div><dt>Equipamento</dt><dd>{ticketDetail.equipment || "Não informado"}</dd></div>
                     {ticketDetail.asset_tag && <div><dt>Patrimônio</dt><dd>{ticketDetail.asset_tag}</dd></div>}
-                    {selectedTicket.is_deleted && <div><dt>Excluído por</dt><dd>{ticketDetail.deleted_by_name || "Administrador"}</dd></div>}
+                    {selectedTicket.is_deleted && <div><dt>Arquivado por</dt><dd>{ticketDetail.deleted_by_name || "Não informado"}</dd></div>}
                   </dl>
                 </div>
 
                 <footer className="admin-event-modal-footer ticket-deleted-modal-actions">
                   <span>
                     {selectedTicket.is_deleted ? "Histórico e comentários preservados." : "Abra o chamado para consultar o histórico completo e as fotos."}
-                    {selectedTicket.is_deleted && user?.role === "admin" && <> Voltará como {STATUS_OPTIONS.find((option) => option.value === ticketDetail.status)?.label || ticketDetail.status}.</>}
+                    {selectedTicket.is_deleted && user?.role === "admin" && <> Voltará como {ticketDetail.status === "cancelled" ? "Aberto" : STATUS_OPTIONS.find((option) => option.value === ticketDetail.status)?.label || ticketDetail.status}.</>}
                   </span>
                   <div className="ticket-preview-actions">
                     <button type="button" className="secondary small" onClick={viewFullTicket}>

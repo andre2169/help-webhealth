@@ -4,6 +4,8 @@ import {
   confirmEmailChange,
   confirmEmailVerification,
   confirmPasswordChange,
+  generateMfaRecoveryCodes,
+  getMfaRecoveryCodeStatus,
   requestEmailChange,
   requestEmailVerification,
   requestPasswordChange,
@@ -119,6 +121,21 @@ export default function Profile() {
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState("");
   const [verifyError, setVerifyError] = useState("");
+  const [recoveryRemaining, setRecoveryRemaining] = useState(null);
+  const [recoveryPassword, setRecoveryPassword] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
+  const [recoveryMessage, setRecoveryMessage] = useState("");
+
+  useEffect(() => {
+    if (!user || !["admin", "technician"].includes(user.role)) return undefined;
+    let active = true;
+    getMfaRecoveryCodeStatus()
+      .then((result) => active && setRecoveryRemaining(result.remaining))
+      .catch(() => active && setRecoveryRemaining(null));
+    return () => { active = false; };
+  }, [user]);
 
   useEffect(() => {
     setName(user?.name || "");
@@ -188,6 +205,33 @@ export default function Profile() {
     } finally {
       profileSaveLock.current = false;
       setProfileSaving(false);
+    }
+  }
+
+  async function createRecoveryCodes(event) {
+    event.preventDefault();
+    setRecoveryError("");
+    setRecoveryMessage("");
+    setRecoveryBusy(true);
+    try {
+      const result = await generateMfaRecoveryCodes(recoveryPassword);
+      setRecoveryCodes(result.codes);
+      setRecoveryRemaining(result.remaining);
+      setRecoveryPassword("");
+      setRecoveryMessage("Guarde estes códigos agora. Eles não serão exibidos novamente.");
+    } catch (err) {
+      setRecoveryError(err.message);
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
+
+  async function copyRecoveryCodes() {
+    try {
+      await navigator.clipboard.writeText(recoveryCodes.join("\n"));
+      setRecoveryMessage("Códigos copiados. Guarde-os em local protegido.");
+    } catch {
+      setRecoveryError("Não foi possível copiar automaticamente. Selecione os códigos e copie-os.");
     }
   }
 
@@ -391,7 +435,8 @@ export default function Profile() {
         {error && <p className="error">{error}</p>}
         {message && <p className="success">{message}</p>}
 
-        <section className="profile-identity panel">
+        <div className={`profile-overview-grid${["admin", "technician"].includes(user?.role) ? "" : " is-basic"}`}>
+          <section className="profile-identity panel">
           <div className="profile-identity-main">
             <UserAvatar user={user} src={avatarSrc} size={76} className="profile-avatar" />
             <div className="profile-identity-text">
@@ -421,7 +466,50 @@ export default function Profile() {
             {avatarError && <p className="error compact-feedback">{avatarError}</p>}
             {avatarMessage && <p className="success compact-feedback">{avatarMessage}</p>}
           </div>
-        </section>
+          </section>
+
+        {["admin", "technician"].includes(user?.role) && (
+          <section className="panel mfa-recovery-panel">
+            <div className="mfa-recovery-heading">
+              <div>
+                <h3><Icon name="shield" /> CÓDIGOS DE RECUPERAÇÃO MFA</h3>
+                <p className="muted-note">Códigos de uso único para entrar se você não conseguir receber o código por email. Restantes: {recoveryRemaining ?? "indisponível"}.</p>
+              </div>
+            </div>
+            {recoveryCodes.length === 0 ? (
+              <form className="mfa-recovery-generate" onSubmit={createRecoveryCodes}>
+                <label htmlFor="mfa-recovery-current-password">Confirme sua senha atual</label>
+                <div className="mfa-recovery-actions">
+                  <PasswordField
+                    id="mfa-recovery-current-password"
+                    value={recoveryPassword}
+                    onChange={(event) => setRecoveryPassword(event.target.value)}
+                    autoComplete="current-password"
+                    maxLength={PROFILE_LIMITS.password}
+                    required
+                  />
+                  <button type="submit" className="secondary" disabled={recoveryBusy || !recoveryPassword}>
+                    <Icon name="key" />
+                    {recoveryBusy ? "Gerando…" : "Gerar novos códigos"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mfa-recovery-once" role="status">
+                <div className="mfa-recovery-code-list">
+                  {recoveryCodes.map((code) => <code key={code}>{code}</code>)}
+                </div>
+                <button type="button" className="secondary small" onClick={copyRecoveryCodes}>
+                  <Icon name="copy" /> Copiar códigos
+                </button>
+              </div>
+            )}
+            <p className="field-hint">Gerar novos códigos invalida os anteriores ainda não utilizados. Cada código funciona uma única vez.</p>
+            {recoveryError && <p className="error compact-feedback">{recoveryError}</p>}
+            {recoveryMessage && <p className="success compact-feedback">{recoveryMessage}</p>}
+          </section>
+          )}
+        </div>
 
         {user && !user.email_verified && (
           <form className="panel email-verification-panel" onSubmit={confirmVerifyEmailCode}>

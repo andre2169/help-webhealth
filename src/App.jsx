@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 import { RequireAuth, RequireRole } from "./components/RequireAuth";
 import AppLayout from "./components/AppLayout";
+import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Home from "./pages/Home";
@@ -15,6 +16,8 @@ import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminNotificationEvents from "./pages/admin/AdminNotificationEvents";
+import AdminMaintenanceNotices from "./pages/admin/AdminMaintenanceNotices";
+import AdminTicketCatalog from "./pages/admin/AdminTicketCatalog";
 import "./style.css";
 
 function PublicOnly({ children }) {
@@ -28,6 +31,7 @@ export default function App() {
   return (
     <AuthProvider>
       <NotificationsProvider>
+        <PwaInstallPrompt />
         <Routes>
           <Route
             path="/login"
@@ -64,6 +68,8 @@ export default function App() {
               <Route element={<RequireRole roles={["admin"]} />}>
                 <Route path="/admin/usuarios" element={<AdminUsers />} />
                 <Route path="/admin/eventos" element={<AdminNotificationEvents />} />
+                <Route path="/admin/avisos" element={<AdminMaintenanceNotices />} />
+                <Route path="/admin/catalogo" element={<AdminTicketCatalog />} />
               </Route>
             </Route>
           </Route>

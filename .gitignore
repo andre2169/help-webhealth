@@ -12,6 +12,11 @@ node_modules/
 dist/
 dist-ssr/
 .cache/
+test-results/
+*.zip
+*.pem
+*.key
+*.pfx
 
 # Variaveis de ambiente
 .env

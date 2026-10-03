@@ -5,6 +5,8 @@ import Icon from "../components/Icon";
 import ImageLightbox from "../components/ImageLightbox";
 import Topbar from "../components/Topbar";
 import { useAuth } from "../context/AuthContext";
+import { detectSensitiveData } from "../utils/sensitiveData";
+import useTicketCatalog from "../hooks/useTicketCatalog";
 import {
   MAX_TICKET_IMAGES,
   MAX_TICKET_IMAGES_TOTAL_LENGTH,
@@ -15,36 +17,6 @@ import {
   validateLongText,
   validateShortText,
 } from "../utils/validation";
-
-const SECTORS = [
-  "Recepção",
-  "UTI",
-  "Enfermaria",
-  "Laboratório",
-  "Farmácia",
-  "Centro Cirúrgico",
-  "Pronto Atendimento",
-  "Radiologia",
-  "Ambulatório",
-  "Almoxarifado",
-  "Administrativo",
-  "TI",
-];
-
-const CATEGORIES = [
-  "Infraestrutura",
-  "Rede",
-  "Hardware",
-  "Software hospitalar",
-  "Impressão",
-  "Acesso",
-  "Telefonia",
-  "Internet",
-  "Segurança",
-  "Periféricos",
-  "Sistema de gestão hospitalar",
-  "Leitor ou coletor",
-];
 
 const EQUIPMENTS = [
   "Computador",
@@ -106,6 +78,7 @@ function SuggestionOptions({ field, options, value, onSelect, activeField, setAc
 export default function CreateTicket() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const catalog = useTicketCatalog();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -118,6 +91,9 @@ export default function CreateTicket() {
   const [imageError, setImageError] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [sensitiveWarnings, setSensitiveWarnings] = useState([]);
+  const [warningAcknowledged, setWarningAcknowledged] = useState(false);
+  const formRef = useRef(null);
   const submitLock = useRef(false);
   const [previewIndex, setPreviewIndex] = useState(null);
   const [activeSuggestionField, setActiveSuggestionField] = useState(null);
@@ -131,10 +107,6 @@ export default function CreateTicket() {
       return;
     }
 
-    if (submitLock.current) return;
-    submitLock.current = true;
-
-    setSubmitting(true);
     try {
       const cleanedTitle = validateShortText(title, "Título", {
         required: true,
@@ -152,6 +124,17 @@ export default function CreateTicket() {
         required: true,
         maxLength: TICKET_LIMITS.sector,
       });
+      if (!catalog.categories.includes(cleanedCategory) || !catalog.sectors.includes(cleanedSector)) {
+        throw new Error("Selecione um setor e uma categoria da lista oficial.");
+      }
+
+      const warnings = detectSensitiveData(`${cleanedTitle}\n${cleanedDescription}`);
+      setSensitiveWarnings(warnings);
+      if (warnings.length > 0 && !warningAcknowledged) return;
+
+      if (submitLock.current) return;
+      submitLock.current = true;
+      setSubmitting(true);
 
       const ticket = await createTicket({
         title: cleanedTitle,
@@ -174,8 +157,10 @@ export default function CreateTicket() {
     } catch (err) {
       setError(err.message);
     } finally {
-      submitLock.current = false;
-      setSubmitting(false);
+      if (submitLock.current) {
+        submitLock.current = false;
+        setSubmitting(false);
+      }
     }
   }
 
@@ -252,11 +237,20 @@ export default function CreateTicket() {
           </section>
         )}
 
-        <form className="form-card health-form-card" onSubmit={handleSubmit} aria-disabled={user && !user.email_verified}>
+        <form ref={formRef} className="form-card health-form-card" onSubmit={handleSubmit} aria-disabled={user && !user.email_verified}>
+          {catalog.error && (
+            <div className="catalog-feedback" role="alert">
+              <p className="error">Não foi possível carregar setores e categorias. {catalog.error}</p>
+              <button type="button" className="secondary small" onClick={catalog.reload}><Icon name="refresh" /> Tentar novamente</button>
+            </div>
+          )}
           <label>Título</label>
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setWarningAcknowledged(false);
+            }}
             placeholder="Ex: Impressora da UTI não imprime prescrições"
             maxLength={TICKET_LIMITS.title}
             required
@@ -264,51 +258,35 @@ export default function CreateTicket() {
 
           <div className="form-grid">
             <div>
-              <label>Setor</label>
+              <label htmlFor="ticket-sector">Setor</label>
               <div className="field-control">
-                <input
+                <select
+                  id="ticket-sector"
                   value={sector}
                   onChange={(e) => setSector(e.target.value)}
-                  onFocus={() => setActiveSuggestionField("sector")}
-                  onBlur={() => window.setTimeout(() => setActiveSuggestionField(null), 120)}
-                  placeholder="Ex: Recepção, UTI, Radiologia"
-                  maxLength={TICKET_LIMITS.sector}
+                  disabled={catalog.loading || !!catalog.error}
                   required
-                />
-                <SuggestionOptions
-                  field="sector"
-                  options={SECTORS}
-                  value={sector}
-                  onSelect={setSector}
-                  activeField={activeSuggestionField}
-                  setActiveField={setActiveSuggestionField}
-                />
+                >
+                  <option value="">{catalog.loading ? "Carregando setores..." : "Selecione o setor"}</option>
+                  {catalog.sectors.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
               </div>
-              <p className="field-hint">Escolha uma sugestão ou digite outro setor.</p>
             </div>
 
             <div>
-              <label>Categoria</label>
+              <label htmlFor="ticket-category">Categoria</label>
               <div className="field-control">
-                <input
+                <select
+                  id="ticket-category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  onFocus={() => setActiveSuggestionField("category")}
-                  onBlur={() => window.setTimeout(() => setActiveSuggestionField(null), 120)}
-                  placeholder="Ex: Rede, Hardware, Sistema hospitalar"
-                  maxLength={TICKET_LIMITS.category}
+                  disabled={catalog.loading || !!catalog.error}
                   required
-                />
-                <SuggestionOptions
-                  field="category"
-                  options={CATEGORIES}
-                  value={category}
-                  onSelect={setCategory}
-                  activeField={activeSuggestionField}
-                  setActiveField={setActiveSuggestionField}
-                />
+                >
+                  <option value="">{catalog.loading ? "Carregando categorias..." : "Selecione a categoria"}</option>
+                  {catalog.categories.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
               </div>
-              <p className="field-hint">Use uma categoria pronta ou cadastre uma nova digitando.</p>
             </div>
 
             <div>
@@ -372,7 +350,10 @@ export default function CreateTicket() {
           <textarea
             className="ticket-description-input"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setWarningAcknowledged(false);
+            }}
             placeholder="Descreva o problema, desde quando ocorre, setor afetado e impacto operacional. Não informe dados de pacientes."
             rows="6"
             maxLength={TICKET_LIMITS.description}
@@ -381,6 +362,27 @@ export default function CreateTicket() {
           <p className={counterClass(description, TICKET_LIMITS.description)}>
             {description.length}/{TICKET_LIMITS.description}
           </p>
+
+          {sensitiveWarnings.length > 0 && (
+            <aside className="sensitive-data-warning" role="alert">
+              <div>
+                <strong><Icon name="shield" size={17} /> Revise estas informações antes de enviar</strong>
+                <p>O texto pode conter {sensitiveWarnings.join(", ")}. Não inclua dados identificáveis nem informações clínicas de pacientes. Este aviso é automático e pode falhar; a revisão é sua.</p>
+              </div>
+              {!warningAcknowledged && (
+                <button
+                  type="button"
+                  className="secondary small"
+                  onClick={() => {
+                    setWarningAcknowledged(true);
+                    window.setTimeout(() => formRef.current?.requestSubmit(), 0);
+                  }}
+                >
+                  Continuar após revisar
+                </button>
+              )}
+            </aside>
+          )}
 
           <div className="ticket-photo-field">
             <div>
@@ -433,7 +435,7 @@ export default function CreateTicket() {
 
           {error && <p className="error">{error}</p>}
 
-          <button type="submit" disabled={submitting || (user && !user.email_verified)}>
+          <button type="submit" disabled={submitting || catalog.loading || !!catalog.error || (user && !user.email_verified)}>
             <Icon name="send" />
             {submitting ? "Criando..." : "Criar chamado"}
           </button>

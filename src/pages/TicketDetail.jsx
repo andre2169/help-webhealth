@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   assignTicket,
   adminRestoreDeletedTicket,
   closeTicket,
+  cancelTicket,
   createComment,
   deleteTicket,
   getTicketById,
@@ -16,6 +17,7 @@ import {
 import Icon from "../components/Icon";
 import ImageLightbox from "../components/ImageLightbox";
 import StatusBadge from "../components/StatusBadge";
+import SlaCountdown from "../components/SlaCountdown";
 import Topbar from "../components/Topbar";
 import UserAvatar from "../components/UserAvatar";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +31,8 @@ const EVENT_LABELS = {
   RESOLVED: "Chamado marcado como resolvido",
   CLOSED: "Chamado fechado",
   REOPENED: "Chamado reaberto",
+  CANCELLED: "Chamado cancelado pelo solicitante",
+  RECOVERED: "Chamado recuperado pelo administrador",
 };
 
 const PRIORITY_LABELS = {
@@ -51,6 +55,7 @@ const STATUS_LABELS = {
   resolved: "Resolvido",
   closed: "Fechado",
   reopened: "Reaberto",
+  cancelled: "Cancelado",
 };
 
 const ROLE_LABELS = {
@@ -81,6 +86,7 @@ export default function TicketDetail() {
   const [postingComment, setPostingComment] = useState(false);
   const [notice, setNotice] = useState(location.state?.notice || "");
   const [viewerIndex, setViewerIndex] = useState(null);
+  const actionBusy = useRef(false);
 
   const loadTimeline = useCallback(async () => {
     setTimelineLoading(true);
@@ -128,6 +134,8 @@ export default function TicketDetail() {
   }, [loadTimeline, ticket]);
 
   async function runAction(action) {
+    if (actionBusy.current) return;
+    actionBusy.current = true;
     setActionError("");
     setActionLoading(true);
     try {
@@ -137,6 +145,7 @@ export default function TicketDetail() {
     } catch (err) {
       setActionError(err.message);
     } finally {
+      actionBusy.current = false;
       setActionLoading(false);
     }
   }
@@ -169,11 +178,13 @@ export default function TicketDetail() {
   }
 
   async function handleDeleteTicket() {
+    if (actionBusy.current) return;
     const confirmed = window.confirm(
       "Enviar este chamado para Excluídos? O histórico e os comentários serão preservados, e um administrador poderá recuperá-lo depois."
     );
     if (!confirmed) return;
 
+    actionBusy.current = true;
     setActionError("");
     setActionLoading(true);
     try {
@@ -185,28 +196,58 @@ export default function TicketDetail() {
     } catch (err) {
       setActionError(err.message);
     } finally {
+      actionBusy.current = false;
       setActionLoading(false);
     }
   }
 
   async function handleRestoreArchivedTicket() {
-    if (!ticket || actionLoading || user?.role !== "admin") return;
+    if (!ticket || actionBusy.current || user?.role !== "admin") return;
+    const restoredStatus = ticket.status === "cancelled" ? "open" : ticket.status;
     const confirmed = window.confirm(
-      `Recuperar ${formatTicketCode(ticket.id)}? O chamado voltará com o status ${STATUS_LABELS[ticket.status] || ticket.status}.`
+      `Recuperar ${formatTicketCode(ticket.id)}? O chamado voltará com o status ${STATUS_LABELS[restoredStatus] || restoredStatus}.`
     );
     if (!confirmed) return;
 
+    actionBusy.current = true;
     setActionError("");
     setActionLoading(true);
     try {
       await adminRestoreDeletedTicket(ticket.id);
       navigate(`/tickets?search=${encodeURIComponent(formatTicketCode(ticket.id))}`, {
         replace: true,
-        state: { notice: `${formatTicketCode(ticket.id)} foi recuperado com o status original.` },
+        state: { notice: `${formatTicketCode(ticket.id)} foi recuperado como ${STATUS_LABELS[restoredStatus] || restoredStatus}.` },
       });
     } catch (err) {
       setActionError(err.message);
     } finally {
+      actionBusy.current = false;
+      setActionLoading(false);
+    }
+  }
+
+  async function handleCancelTicket() {
+    if (actionBusy.current || !ticket?.can_cancel) return;
+    if (!window.confirm("Cancelar este chamado? Ele sairá da fila e dos indicadores. O histórico será preservado e apenas o administrador poderá recuperá-lo.")) return;
+    actionBusy.current = true;
+    setActionLoading(true);
+    setActionError("");
+    try {
+      await cancelTicket(ticket.id);
+      navigate("/tickets", {
+        replace: true,
+        state: { notice: `${formatTicketCode(ticket.id)} foi cancelado e retirado da fila.` },
+      });
+    } catch (err) {
+      setActionError(err.message);
+      // Refresh eligibility if assignment won the race with cancellation.
+      try {
+        setTicket(await getTicketById(ticket.id));
+      } catch {
+        setTicket((current) => ({ ...current, can_cancel: false }));
+      }
+    } finally {
+      actionBusy.current = false;
       setActionLoading(false);
     }
   }
@@ -251,8 +292,10 @@ export default function TicketDetail() {
     (role === "admin" || isAssignedTechnician);
   const canClose = !isArchived && ticket.status === "resolved" && (isOwner || role === "admin");
   const canReopen =
-    !isArchived && ["resolved", "closed"].includes(ticket.status) && (isOwner || role === "admin");
+    !isArchived && ["resolved", "closed"].includes(ticket.status) && role === "admin";
   const canDelete = !isArchived && role === "admin";
+  const canCancel = !isArchived && isOwner && ticket.can_cancel === true;
+  const isCancelled = ticket.status === "cancelled";
   const issueImages =
     Array.isArray(ticket.issue_images) && ticket.issue_images.length > 0
       ? ticket.issue_images
@@ -264,7 +307,7 @@ export default function TicketDetail() {
     <>
       <Topbar
         title={formatTicketCode(ticket.id)}
-        subtitle={isArchived ? `${ticket.title} · Chamado excluído` : ticket.title}
+        subtitle={isArchived ? `${ticket.title} · ${isCancelled ? "Cancelado" : "Excluído"}` : ticket.title}
       />
       <main className="main">
         <button className="ghost" style={{ marginBottom: 12, padding: "4px 0" }} onClick={() => navigate(ticketsHref)}>
@@ -282,17 +325,20 @@ export default function TicketDetail() {
         )}
 
         <div className="detail-header">
-          <div className="detail-id"><span className="ticket-code">{formatTicketCode(ticket.id)}</span></div>
+          <div className="detail-badges">
+            <span className="ticket-code">{formatTicketCode(ticket.id)}</span>
+            <StatusBadge status={ticket.status} />
+            {!isArchived && <SlaCountdown ticket={ticket} />}
+          </div>
           <h2 className="detail-title">{ticket.title}</h2>
-          <StatusBadge status={ticket.status} />
         </div>
 
         {isArchived && (
           <section className="ticket-archived-detail-notice" role="status">
             <div>
-              <strong><Icon name="trash" size={17} /> Chamado excluído</strong>
+              <strong><Icon name="trash" size={17} /> Chamado {isCancelled ? "cancelado" : "excluído"}</strong>
               <span>
-                Excluído em {formatApiDateTime(ticket.deleted_at)}
+                {isCancelled ? "Cancelado" : "Excluído"} em {formatApiDateTime(ticket.deleted_at)}
                 {ticket.deleted_by_name ? ` por ${ticket.deleted_by_name}` : ""}. Esta ficha está em modo somente leitura.
               </span>
               {actionError && <p className="error">{actionError}</p>}
@@ -305,6 +351,7 @@ export default function TicketDetail() {
             )}
           </section>
         )}
+        {!isArchived && actionError && <p className="error" role="alert">{actionError}</p>}
 
         <div className="health-context-strip">
           <div>
@@ -320,7 +367,7 @@ export default function TicketDetail() {
             <strong>{IMPACT_LABELS[ticket.operational_impact] || "Médio"}</strong>
           </div>
           <div>
-            <span>SLA</span>
+            <span>Prazo SLA</span>
             <strong>{ticket.sla_hours || 24}h</strong>
           </div>
         </div>
@@ -363,7 +410,7 @@ export default function TicketDetail() {
               {timelineLoading && <p className="loading-line">Carregando histórico...</p>}
 
               {!timelineLoading && (
-                <div className="timeline">
+                <div className="timeline" tabIndex={0} role="region" aria-label="Histórico e comentários do chamado">
                   {timeline.map((item) => {
                     const author = item.author || {};
                     const authorName = author.name || "Sistema";
@@ -372,7 +419,7 @@ export default function TicketDetail() {
                     return (
                       <div
                         key={`${item.type}-${item.id}`}
-                        className={`timeline-item${item.type === "comment" ? " is-comment" : ""}`}
+                        className={`timeline-item${item.type === "comment" ? " is-comment" : ` event-kind-${String(item.event_type || "").toLowerCase()}`}`}
                       >
                         <UserAvatar user={author} name={authorName} size={36} className="timeline-avatar" />
                         <div className="timeline-card">
@@ -406,19 +453,22 @@ export default function TicketDetail() {
                 <div className="comment-composer">
                   <UserAvatar user={user} size={38} className="comment-avatar" />
                   <div className="comment-composer-body">
-                    <label>Adicionar comentário</label>
+                    <label htmlFor="ticket-comment">Adicionar comentário</label>
                     <textarea
+                      id="ticket-comment"
                       className="comment-input"
+                      aria-describedby={`ticket-comment-counter${commentError ? " ticket-comment-error" : ""}`}
+                      aria-invalid={Boolean(commentError)}
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       placeholder="Escreva uma atualização ou pergunta sobre o chamado"
                       rows="3"
                       maxLength={COMMENT_LIMIT}
                     />
-                    <p className={comment.length >= COMMENT_LIMIT * 0.9 ? "field-counter is-warning" : "field-counter"}>
+                    <p id="ticket-comment-counter" className={comment.length >= COMMENT_LIMIT * 0.9 ? "field-counter is-warning" : "field-counter"}>
                       {comment.length}/{COMMENT_LIMIT}
                     </p>
-                    {commentError && <p className="error">{commentError}</p>}
+                    {commentError && <p id="ticket-comment-error" className="error" role="alert">{commentError}</p>}
                     <button
                       type="submit"
                       className="secondary"
@@ -494,14 +544,19 @@ export default function TicketDetail() {
               )}
             </div>
 
-            {!isArchived && (canAssign || canResolve || canClose || canReopen || canDelete) && (
+            {!isArchived && (canAssign || canResolve || canClose || canReopen || canDelete || canCancel) && (
               <div className="side-panel">
                 <h4>
                   <Icon name="activity" />
                   Ações
                 </h4>
-                {actionError && <p className="error">{actionError}</p>}
                 <div className="action-stack">
+                  {canCancel && (
+                    <button className="danger" disabled={actionLoading} onClick={handleCancelTicket}>
+                      <Icon name="x" />
+                      {actionLoading ? "Processando..." : "Cancelar chamado"}
+                    </button>
+                  )}
                   {canAssign && (
                     <button disabled={actionLoading} onClick={() => runAction(() => assignTicket(ticket.id))}>
                       <Icon name={ticket.status === "reopened" ? "refresh" : "play"} />
@@ -541,6 +596,7 @@ export default function TicketDetail() {
                     </button>
                   )}
                 </div>
+                {canCancel && <p className="ticket-cancel-hint">Cancelamento disponível apenas antes do primeiro atendimento.</p>}
               </div>
             )}
           </div>

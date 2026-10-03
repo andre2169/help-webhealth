@@ -169,7 +169,7 @@ export function validateLongText(value, label, { required = false, maxLength } =
   if (maxLength && text.length > maxLength) {
     throw new Error(`${label} deve ter no máximo ${maxLength} caracteres.`);
   }
-  if (hasEmojiOrControl(text)) {
+  if (hasEmojiOrControl(text.replace(/[\n\r\t]/g, ""))) {
     throw new Error(`${label} não aceita emoji ou caracteres invisíveis.`);
   }
   if (DANGEROUS_TEXT_RE.test(text)) {

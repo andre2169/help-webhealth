@@ -129,7 +129,7 @@ export default function NotificationCenter() {
               <button
                 type="button"
                 key={notification.id}
-                className={`notification-item ${
+                className={`notification-item notification-item-${notification.type || "default"} ${
                   notification.is_read ? "" : "unread"
                 }`}
                 onClick={() => handleOpenNotification(notification)}

@@ -1,6 +1,6 @@
 const APP_TIME_ZONE = "America/Sao_Paulo";
 
-function parseApiDate(value) {
+export function parseApiDate(value) {
   if (!value) return null;
   if (value instanceof Date) return value;
 
@@ -40,4 +40,18 @@ export function formatApiDateTime(value, fallback = "Não definido") {
     minute: "2-digit",
     timeZone: APP_TIME_ZONE,
   });
+}
+
+export function apiDateToLocalInput(value) {
+  const date = parseApiDate(value);
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const pad = number => String(number).padStart(2, "0");
+  return `${String(date.getFullYear()).padStart(4, "0")}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function localDateTimeToIso(value) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value || "")) return null;
+  const date = new Date(`${value}:00`);
+  if (Number.isNaN(date.getTime()) || apiDateToLocalInput(date) !== value) return null;
+  return date.toISOString();
 }

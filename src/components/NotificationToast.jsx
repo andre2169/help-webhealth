@@ -18,7 +18,7 @@ export default function NotificationToast() {
   }
 
   return (
-    <div className="notification-toast" role="status" aria-live="polite">
+    <div className={`notification-toast notification-toast-${toastNotification.type || "default"}`} role="status" aria-live="polite">
       <div className="notification-toast-icon">
         <Icon
           name={

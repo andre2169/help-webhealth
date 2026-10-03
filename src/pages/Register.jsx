@@ -4,6 +4,8 @@ import { registerUser } from "../api/api";
 import Icon from "../components/Icon";
 import PasswordField from "../components/PasswordField";
 import ThemeToggle from "../components/ThemeToggle";
+import BrandLogo from "../components/BrandLogo";
+import SiteFooter from "../components/SiteFooter";
 import {
   BRAZIL_PHONE_HINT,
   BRAZIL_PHONE_MAX_LENGTH,
@@ -72,13 +74,8 @@ export default function Register() {
     <div className="auth-shell auth-shell-modern">
       <div className="auth-theme-control"><ThemeToggle compact /></div>
       <div className="card auth-card auth-register-card">
-        <div className="card-brand">
-          <div className="card-brand-mark"><Icon name="shield" size={20} /></div>
-          <div>
-            <strong style={{ display: "block", fontFamily: "var(--font-display)" }}>
-              HelpWeb Health
-            </strong>
-          </div>
+        <div className="card-brand auth-brand">
+          <BrandLogo full className="auth-brand-logo" />
         </div>
 
         <h1>Criar sua conta</h1>
@@ -207,6 +204,7 @@ export default function Register() {
           Já tem conta? <Link to="/login">Entrar</Link>
         </p>
       </div>
+      <SiteFooter />
     </div>
   );
 }

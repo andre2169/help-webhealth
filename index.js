@@ -1,11 +1,12 @@
 import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { join, normalize, sep } from "node:path";
+import { join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = normalize(join(fileURLToPath(new URL(".", import.meta.url)), "dist"));
 const port = Number(process.env.PORT || 4173);
 const fallbackApiOrigin = "https://backendhelpapihealth.shardweb.app";
+const localApiOrigins = ["http://localhost:8000", "http://127.0.0.1:8000"];
 const MAX_URL_LENGTH = 2048;
 const MAX_HEADER_BYTES = 32_000;
 const STATIC_CACHE_SECONDS = 31_536_000;
@@ -18,15 +19,20 @@ const mimeTypes = {
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".webp": "image/webp",
 };
 
-function getApiOrigin() {
+function getApiOrigins() {
+  const origins = new Set(localApiOrigins);
+
   try {
-    return new URL(process.env.VITE_API_URL || fallbackApiOrigin).origin;
+    origins.add(new URL(process.env.VITE_API_URL || fallbackApiOrigin).origin);
   } catch {
-    return fallbackApiOrigin;
+    origins.add(fallbackApiOrigin);
   }
+
+  return [...origins].join(" ");
 }
 
 const securityHeaders = {
@@ -42,7 +48,7 @@ const securityHeaders = {
   "Content-Security-Policy": [
     "default-src 'self'",
     "base-uri 'none'",
-    "connect-src 'self' " + getApiOrigin(),
+    "connect-src 'self' " + getApiOrigins(),
     "font-src 'self' data:",
     "form-action 'self'",
     "frame-ancestors 'none'",
@@ -59,6 +65,11 @@ function getExtension(pathname) {
 }
 
 function getCacheControl(filePath) {
+  const fileName = filePath.split(sep).pop();
+  if (fileName === "sw.js" || fileName === "manifest.webmanifest") {
+    return "no-store";
+  }
+
   if (filePath.includes(`${sep}assets${sep}`)) {
     return `public, max-age=${STATIC_CACHE_SECONDS}, immutable`;
   }
@@ -104,7 +115,7 @@ function sendFile(request, response, filePath) {
   createReadStream(filePath).pipe(response);
 }
 
-function resolvePath(urlPath) {
+function resolvePath(urlPath, documentRoot) {
   let cleanPath = "/";
   try {
     cleanPath = decodeURIComponent(urlPath.split("?")[0]);
@@ -112,9 +123,10 @@ function resolvePath(urlPath) {
     return null;
   }
 
-  const requestedPath = normalize(join(root, cleanPath));
+  if (cleanPath.includes("\0")) return null;
+  const requestedPath = normalize(join(documentRoot, cleanPath));
 
-  if (requestedPath !== root && !requestedPath.startsWith(root + sep)) {
+  if (requestedPath !== documentRoot && !requestedPath.startsWith(documentRoot + sep)) {
     return null;
   }
 
@@ -122,10 +134,16 @@ function resolvePath(urlPath) {
     return requestedPath;
   }
 
-  return join(root, "index.html");
+  // Missing assets and API routes must never receive a successful HTML response.
+  if (/\.[^/]+$/.test(cleanPath) || /^\/(?:assets|icons|brand|api)(?:\/|$)/.test(cleanPath)) {
+    return null;
+  }
+  return join(documentRoot, "index.html");
 }
 
-createServer((request, response) => {
+export function createWebServer({ documentRoot = root } = {}) {
+  const safeRoot = resolve(documentRoot);
+  return createServer((request, response) => {
   if (!["GET", "HEAD"].includes(request.method || "")) {
     response.writeHead(405, {
       ...securityHeaders,
@@ -152,7 +170,7 @@ createServer((request, response) => {
     return;
   }
 
-  const filePath = resolvePath(request.url || "/");
+  const filePath = resolvePath(request.url || "/", safeRoot);
 
   if (!filePath || !existsSync(filePath)) {
     sendText(request, response, 404, "Not found");
@@ -160,6 +178,11 @@ createServer((request, response) => {
   }
 
   sendFile(request, response, filePath);
-}).listen(port, "0.0.0.0", () => {
-  console.log(`helphealth-web listening on ${port}`);
-});
+  });
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  createWebServer().listen(port, "0.0.0.0", () => {
+    console.log(`helphealth-web listening on ${port}`);
+  });
+}
