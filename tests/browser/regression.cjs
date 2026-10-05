@@ -6,8 +6,8 @@ const output = path.resolve(process.env.UI_TEST_OUTPUT || path.join(__dirname, '
 const base = process.env.UI_TEST_BASE_URL || 'http://localhost:5173';
 assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname), 'UI mocks are allowed only on loopback');
 
-async function fixture(browser, { role = 'user', theme = 'dark', width = 390, standalone = true, authenticated = true } = {}) {
-  const context = await browser.newContext({ viewport: { width, height: width > 720 ? 900 : 844 }, locale: 'pt-BR', serviceWorkers: 'block' });
+async function fixture(browser, { role = 'user', theme = 'dark', width = 390, height = width > 720 ? 900 : 844, standalone = true, authenticated = true } = {}) {
+  const context = await browser.newContext({ viewport: { width, height }, locale: 'pt-BR', serviceWorkers: 'block' });
   await context.addInitScript(({ theme, standalone }) => {
     localStorage.setItem('helpwebhealth_theme', theme);
     if (standalone) Object.defineProperty(navigator, 'standalone', { value: true });
@@ -88,6 +88,24 @@ async function fits(page) {
   assert.ok(boxes.filter(box => box.width > 0).every(box => box.x >= -1 && box.right <= width + 1), `Actions and footer fit: ${JSON.stringify(boxes)}`);
 }
 
+async function currentFilterFits(page, label) {
+  const panel = page.locator('.ticket-filters-panel');
+  const current = panel.locator('.collapsible-panel-header .ticket-filter-current');
+  await current.getByText(label, { exact: true }).waitFor();
+  assert.equal(await page.getByText('Filtro atual', { exact: true }).count(), 1, 'Current filter appears only in the filters header');
+  assert.equal(await page.locator('.summary-card').count(), label === 'Excluídos e cancelados' ? 0 : 2, 'Summary contains only ticket counts');
+  assert.equal(await current.getAttribute('aria-live'), 'polite');
+  const titleBox = await panel.locator('.collapsible-panel-heading-content').boundingBox();
+  const currentBox = await current.boundingBox();
+  const headerBox = await panel.locator('.collapsible-panel-header').boundingBox();
+  if (currentBox.x < titleBox.x + titleBox.width + 9) await panel.screenshot({ path: path.join(output, 'filters-layout-failure.png') });
+  assert.ok(currentBox.x >= titleBox.x + titleBox.width + 9, `Current filter sits beside the heading without overlap: ${JSON.stringify({ titleBox, currentBox, headerBox })}`);
+  assert.ok(currentBox.x + currentBox.width <= headerBox.x + headerBox.width + 1, 'Current filter stays inside the header');
+  assert.ok(Math.abs(currentBox.y + currentBox.height / 2 - titleBox.y - titleBox.height / 2) <= 1, 'Heading and current filter align vertically');
+  const fitsLabel = await current.locator('strong').evaluate(element => element.scrollWidth <= element.clientWidth + 1);
+  assert.ok(fitsLabel, 'Full status label fits without clipping');
+}
+
 (async () => {
   await fs.mkdir(output, { recursive: true });
   let server, browser;
@@ -144,13 +162,17 @@ async function fits(page) {
       if ([390, 1440].includes(width)) await page.screenshot({ path: path.join(output, `${role}-${theme}-${width}.png`), fullPage: true, animations: 'disabled' });
       await page.goto(`${base}/tickets`);
       await page.locator('.ticket-row').waitFor();
+      await currentFilterFits(page, 'Todos');
+      if (role === 'user' && [390, 1440].includes(width)) await page.locator('.ticket-filters-panel').screenshot({ path: path.join(output, `filters-${role}-${theme}-${width}.png`) });
       await page.getByRole('note').getByText(/Todos os status inclui/).waitFor();
       await page.locator('#ticket-status').selectOption('resolved');
+      await currentFilterFits(page, 'Resolvido');
       await page.getByRole('note').getByText(/status Resolvido/).waitFor();
       state.setEmpty(true);
       await page.locator('#ticket-status').selectOption('open');
       await page.getByText('Nenhum chamado corresponde a esta seleção', { exact: true }).waitFor();
       await page.locator('#ticket-status').selectOption('deleted');
+      await currentFilterFits(page, 'Excluídos e cancelados');
       await page.getByRole('note').getByText(/Somente o administrador pode recuperá-los/).waitFor();
       await fits(page);
       if (role === 'admin' && width === 390) await page.screenshot({ path: path.join(output, `${role}-${theme}-${width}-filters.png`), fullPage: true, animations: 'disabled' });
@@ -165,6 +187,10 @@ async function fits(page) {
       await state.page.locator('.home-action-grid').waitFor();
       const ys = await state.page.locator('.sidebar-link').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().y));
       assert.ok(ys.every(y => y === ys[0]));
+      await fits(state.page);
+      await state.page.goto(`${base}/tickets`);
+      await state.page.locator('.ticket-row').waitFor();
+      await currentFilterFits(state.page, 'Todos');
       await fits(state.page); await state.context.close(); scenarios++;
       const login = await fixture(browser, { theme, width: 320, authenticated: false });
       await login.page.goto(`${base}/login`);
@@ -252,6 +278,37 @@ async function fits(page) {
       assert.ok(await rotation.page.getByRole('link', { name: 'Início', exact: true }).first().isVisible());
     }
     await rotation.context.close(); scenarios++;
+
+    for (const role of ['user', 'technician', 'admin']) for (const theme of ['dark', 'light']) for (const standalone of [true, false]) for (const viewport of [{ width: 768, height: 1024 }, { width: 1024, height: 768 }]) {
+      const state = await fixture(browser, { role, theme, standalone, ...viewport });
+      const { page } = state;
+      await page.goto(`${base}/tickets`);
+      await page.locator('.ticket-row').waitFor();
+      await currentFilterFits(page, 'Todos');
+      await page.locator('#ticket-status').selectOption('in_progress');
+      await currentFilterFits(page, 'Em andamento');
+      const heading = page.locator('.ticket-filters-panel .collapsible-panel-heading-content');
+      await heading.focus(); await page.keyboard.press('Enter');
+      assert.equal(await heading.getAttribute('aria-expanded'), 'false');
+      assert.equal(await page.locator('#ticket-status').isVisible(), false);
+      await currentFilterFits(page, 'Em andamento');
+      await page.reload();
+      await currentFilterFits(page, 'Em andamento');
+      assert.equal(await heading.getAttribute('aria-expanded'), 'false', 'Panel preference and status survive reload');
+      await heading.focus(); await page.keyboard.press('Space');
+      await page.locator('#ticket-status').selectOption('deleted');
+      await currentFilterFits(page, 'Excluídos e cancelados');
+      await fits(page);
+      if (role === 'admin') await page.locator('.ticket-filters-panel').screenshot({ path: path.join(output, `filters-tablet-${theme}-${standalone ? 'pwa' : 'browser'}-${viewport.width}.png`) });
+      await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+      await currentFilterFits(page, 'Todos');
+      await page.setViewportSize({ width: viewport.height, height: viewport.width });
+      await currentFilterFits(page, 'Todos');
+      await fits(page);
+      assert.deepEqual(state.errors, []);
+      await state.context.close(); scenarios++;
+      console.log(`PASS filters ${role} ${theme} ${standalone ? 'PWA' : 'browser'} ${viewport.width}: inline status, collapse, reset and tablet rotation`);
+    }
 
     const longText = await fixture(browser, { width: 320 });
     longText.setName('André ' + 'Vilas '.repeat(17));

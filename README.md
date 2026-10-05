@@ -326,6 +326,10 @@ Os cenarios incluem o cabecalho do chamado, espacamento do contador,
 limite/envio de comentarios e modo somente leitura dos chamados arquivados,
 em quatro larguras e nos dois temas. `UI_TEST_DETAIL_ONLY=1` executa apenas
 esse recorte de interface; as requisicoes usam dados simulados.
+O filtro atual aparece ao lado do titulo da area de filtros, inclusive quando
+recolhida, sem um indicador separado entre as metricas. Os testes tambem
+cobrem tablets em retrato/paisagem, navegador e PWA emulado, os tres perfis,
+os dois temas, troca de status, limpeza e persistencia apos recarregar.
 `npm run test:pwa` testa ativacao, exclusao de dados da API e shell offline
 com service worker real no navegador e build servido na porta 5173.
 Feche outro frontend nessa porta antes desta verificacao isolada.

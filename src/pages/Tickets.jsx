@@ -308,7 +308,6 @@ export default function Tickets() {
           {[
             { key: "page-total", icon: "ticket", title: "Nesta página", value: tickets.length },
             { key: "page-open", icon: "activity", title: "Abertos nesta página", value: openCount },
-            { key: "active-filter", icon: "filter", title: "Filtro atual", value: status ? STATUS_OPTIONS.find((item) => item.value === status)?.label : "Todos" },
           ].map((metric) => (
             <article
               key={metric.key}
@@ -329,6 +328,12 @@ export default function Tickets() {
           title="Filtros dos chamados"
           icon="filter"
           className="panel ticket-filters-panel"
+          actions={(
+            <div className="ticket-filter-current" role="status" aria-live="polite" aria-atomic="true">
+              <span>Filtro atual</span>
+              <strong>{statusLabel || "Todos"}</strong>
+            </div>
+          )}
         >
         <div className="filters ticket-filter-grid">
           <div>
